@@ -1,40 +1,28 @@
 use std::{borrow::Cow, mem::size_of_val, str::FromStr};
-use wgpu::util::DeviceExt;
+use std::ops::Range;
+use wgpu::BufferAddress;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 // Indicates a u32 overflow in an intermediate Collatz value
 const OVERFLOW: u32 = 0xffffffff;
 
 #[cfg_attr(test, allow(dead_code))]
 async fn run() {
-    let numbers = if std::env::args().len() <= 2 {
-        //let default = vec![1, 2, 3, 4];
-        let default: Vec<_> = (1..10000).into_iter().collect();
+    let steps = execute_gpu(65535).await.unwrap();
 
-        //println!("No numbers were provided, defaulting to {default:?}");
-        default
-    } else {
-        std::env::args()
-            .skip(2)
-            .map(|s| u32::from_str(&s).expect("You must pass a list of positive integers!"))
-            .collect()
-    };
+    let (n, steps) = steps.iter().enumerate().fold((0usize, 0u32), |acc, el| {
+        if acc.1 <= *el.1 {
+            (el.0, *el.1)
+        } else {
+            acc
+        }
+    });
 
-    let steps = execute_gpu(&numbers).await.unwrap();
-
-    let disp_steps: Vec<String> = steps
-        .iter()
-        .map(|&n| match n {
-            OVERFLOW => "OVERFLOW".to_string(),
-            _ => n.to_string(),
-        })
-        .collect();
-
-    println!("Max steps under 10000: {}", steps.iter().max().unwrap());
-    //println!("Steps: [{}]", disp_steps.join(", "));
+    println!("Max steps: {} at {}", n, steps);
 }
 
 #[cfg_attr(test, allow(dead_code))]
-async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
+async fn execute_gpu(max: u32) -> Option<Vec<u32>> {
     // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
 
@@ -58,13 +46,13 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
         .await
         .unwrap();
 
-    execute_gpu_inner(&device, &queue, numbers).await
+    execute_gpu_inner(&device, &queue, max).await
 }
 
 async fn execute_gpu_inner(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    numbers: &[u32],
+    max: u32
 ) -> Option<Vec<u32>> {
     // Loads the shader from WGSL
     let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -72,8 +60,8 @@ async fn execute_gpu_inner(
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
     });
 
-    // Gets the size in bytes of the buffer.
-    let size = size_of_val(numbers) as wgpu::BufferAddress;
+    // // Gets the size in bytes of the buffer.
+    let size = (4 * max) as wgpu::BufferAddress;
 
     // Instantiates buffer without data.
     // `usage` of buffer specifies how it can be used:
@@ -91,21 +79,14 @@ async fn execute_gpu_inner(
     //   A storage buffer (can be bound within a bind group and thus available to a shader).
     //   The destination of a copy.
     //   The source of a copy.
-    let storage_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Storage Buffer"),
-        contents: bytemuck::cast_slice(numbers),
+        size,
         usage: wgpu::BufferUsages::STORAGE
-            | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false
     });
 
-    // A bind group defines how buffers are accessed by shaders.
-    // It is to WebGPU what a descriptor set is to Vulkan.
-    // `binding` here refers to the `binding` of a buffer in the shader (`layout(set = 0, binding = 0) buffer`).
-
-    // A pipeline specifies the operation of a shader
-
-    // Instantiates the pipeline.
     let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
         label: None,
         layout: None,
@@ -138,10 +119,10 @@ async fn execute_gpu_inner(
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.insert_debug_marker("compute collatz iterations");
-        cpass.dispatch_workgroups(numbers.len() as u32, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        cpass.dispatch_workgroups(max as u32, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
-    // Sets adds copy operation to command encoder.
-    // Will copy data from storage buffer on GPU to staging buffer on CPU.
+    // // Sets adds copy operation to command encoder.
+    // // Will copy data from storage buffer on GPU to staging buffer on CPU.
     encoder.copy_buffer_to_buffer(&storage_buffer, 0, &staging_buffer, 0, size);
 
     // Submits command encoder for processing
