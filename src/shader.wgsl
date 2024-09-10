@@ -1,3 +1,4 @@
+/*
 @group(0)
 @binding(0)
 var<storage, read_write> v_indices: array<u32>; // this is used as both input and output for convenience
@@ -30,9 +31,18 @@ fn collatz_iterations(n_base: u32) -> u32{
     }
     return i;
 }
-
+*/
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    v_indices[global_id.x] = collatz_iterations(global_id[0]);
+    //v_indices[global_id.x] = collatz_iterations(global_id[0]);
+}
+
+@group(0) @binding(0)
+var out_texture: texture_storage_2d<rgba8unorm, write>;
+
+@compute
+@workgroup_size(1)
+fn pixel_shader(@builtin(global_invocation_id) global_id: vec3<u32>) {
+   textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(0, 0.3, 0.5, 1.0));
 }
