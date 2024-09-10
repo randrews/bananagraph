@@ -1,7 +1,8 @@
 use std::{borrow::Cow, mem::size_of_val, str::FromStr};
 use std::ops::Range;
-use wgpu::BufferAddress;
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use std::sync::{Arc, Mutex};
+use wgpu::{BufferAddress, BufferAsyncError, Maintain};
+use wgpu::util::{BufferInitDescriptor, DeviceExt, DownloadBuffer};
 
 // Indicates a u32 overflow in an intermediate Collatz value
 const OVERFLOW: u32 = 0xffffffff;
@@ -63,17 +64,6 @@ async fn execute_gpu_inner(
     // // Gets the size in bytes of the buffer.
     let size = (4 * max) as wgpu::BufferAddress;
 
-    // Instantiates buffer without data.
-    // `usage` of buffer specifies how it can be used:
-    //   `BufferUsages::MAP_READ` allows it to be read (outside the shader).
-    //   `BufferUsages::COPY_DST` allows it to be the destination of the copy.
-    let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: None,
-        size,
-        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-
     // Instantiates buffer with data (`numbers`).
     // Usage allowing the buffer to be:
     //   A storage buffer (can be bound within a bind group and thus available to a shader).
@@ -121,45 +111,21 @@ async fn execute_gpu_inner(
         cpass.insert_debug_marker("compute collatz iterations");
         cpass.dispatch_workgroups(max as u32, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
-    // // Sets adds copy operation to command encoder.
-    // // Will copy data from storage buffer on GPU to staging buffer on CPU.
-    encoder.copy_buffer_to_buffer(&storage_buffer, 0, &staging_buffer, 0, size);
 
     // Submits command encoder for processing
     queue.submit(Some(encoder.finish()));
 
-    // Note that we're not calling `.await` here.
-    let buffer_slice = staging_buffer.slice(..);
-    // Sets the buffer up for mapping, sending over the result of the mapping back to us when it is finished.
-    let (sender, receiver) = flume::bounded(1);
-    buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
-
-    // Poll the device in a blocking manner so that our future resolves.
-    // In an actual application, `device.poll(...)` should
-    // be called in an event loop or on another thread.
-    device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-
-    // Awaits until `buffer_future` can be read from
-    if let Ok(Ok(())) = receiver.recv_async().await {
-        // Gets contents of buffer
-        let data = buffer_slice.get_mapped_range();
-        // Since contents are got in bytes, this converts these bytes back to u32
-        let result = bytemuck::cast_slice(&data).to_vec();
-
-        // With the current interface, we have to make sure all mapped views are
-        // dropped before we unmap the buffer.
-        drop(data);
-        staging_buffer.unmap(); // Unmaps buffer from memory
-        // If you are familiar with C++ these 2 lines can be thought of similarly to:
-        //   delete myPointer;
-        //   myPointer = NULL;
-        // It effectively frees the memory
-
-        // Returns data from buffer
-        Some(result)
-    } else {
-        panic!("failed to run compute on gpu!")
-    }
+    let result: Option<Result<DownloadBuffer, BufferAsyncError>> = None;
+    let mut m = Arc::new(Mutex::new(result));
+    let mut m2 = m.clone();
+    DownloadBuffer::read_buffer(&device, &queue, &storage_buffer.slice(..), move|x| { m.lock().unwrap().insert(x); });
+    let result = loop {
+        if let Some(result) = m2.lock().unwrap().take() {
+            break result
+        }
+        device.poll(Maintain::wait()).panic_on_timeout()
+    };
+    Some(bytemuck::cast_slice(&result.unwrap()).to_vec())
 }
 
 pub fn main() {
