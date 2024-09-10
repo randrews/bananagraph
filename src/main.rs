@@ -1,13 +1,8 @@
-use std::{borrow::Cow, mem::size_of_val, str::FromStr};
-use std::ops::Range;
+use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
-use wgpu::{BufferAddress, BufferAsyncError, Maintain};
-use wgpu::util::{BufferInitDescriptor, DeviceExt, DownloadBuffer};
+use wgpu::{BufferAsyncError, Maintain};
+use wgpu::util::DownloadBuffer;
 
-// Indicates a u32 overflow in an intermediate Collatz value
-const OVERFLOW: u32 = 0xffffffff;
-
-#[cfg_attr(test, allow(dead_code))]
 async fn run() {
     let steps = execute_gpu(65535).await.unwrap();
 
@@ -22,18 +17,13 @@ async fn run() {
     println!("Max steps: {} at {}", n, steps);
 }
 
-#[cfg_attr(test, allow(dead_code))]
 async fn execute_gpu(max: u32) -> Option<Vec<u32>> {
-    // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
 
-    // `request_adapter` instantiates the general connection to the GPU
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
         .await?;
 
-    // `request_device` instantiates the feature specific connection to the GPU, defining some parameters,
-    //  `features` being the available features.
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -61,14 +51,11 @@ async fn execute_gpu_inner(
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
     });
 
-    // // Gets the size in bytes of the buffer.
+    // Gets the size in bytes of the buffer.
     let size = (4 * max) as wgpu::BufferAddress;
 
-    // Instantiates buffer with data (`numbers`).
-    // Usage allowing the buffer to be:
-    //   A storage buffer (can be bound within a bind group and thus available to a shader).
-    //   The destination of a copy.
-    //   The source of a copy.
+    // Create a buffer for the shader to store the values it computes.
+    // This can be used as storage and a copy source (needed for DownloadBuffer to read it)
     let storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Storage Buffer"),
         size,
@@ -86,7 +73,6 @@ async fn execute_gpu_inner(
         cache: None,
     });
 
-    // Instantiates the bind group, once again specifying the binding of buffers.
     let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
@@ -97,8 +83,6 @@ async fn execute_gpu_inner(
         }],
     });
 
-    // A command encoder executes one or many pipelines.
-    // It is to WebGPU what a command buffer is to Vulkan.
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     {
@@ -109,16 +93,16 @@ async fn execute_gpu_inner(
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.insert_debug_marker("compute collatz iterations");
-        cpass.dispatch_workgroups(max as u32, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        cpass.dispatch_workgroups(max, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
 
     // Submits command encoder for processing
     queue.submit(Some(encoder.finish()));
 
     let result: Option<Result<DownloadBuffer, BufferAsyncError>> = None;
-    let mut m = Arc::new(Mutex::new(result));
-    let mut m2 = m.clone();
-    DownloadBuffer::read_buffer(&device, &queue, &storage_buffer.slice(..), move|x| { m.lock().unwrap().insert(x); });
+    let m = Arc::new(Mutex::new(result));
+    let m2 = m.clone();
+    DownloadBuffer::read_buffer(device, queue, &storage_buffer.slice(..), move|x| { let _ = m.lock().unwrap().insert(x); });
     let result = loop {
         if let Some(result) = m2.lock().unwrap().take() {
             break result
