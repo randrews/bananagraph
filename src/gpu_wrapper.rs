@@ -1,4 +1,4 @@
-use wgpu::{BindGroupEntry, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor};
+use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
 
@@ -7,7 +7,8 @@ pub struct GpuWrapper<'a> {
     queue: Queue,
     pipeline: ComputePipeline,
     window: &'a Window,
-    surface: Surface<'a>
+    surface: Surface<'a>,
+    uniform_buffer: Buffer
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -46,7 +47,7 @@ impl<'a> GpuWrapper<'a> {
         let surface_format = TextureFormat::Bgra8Unorm;
 
         let config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
             format: surface_format,
             width: size.width,
             height: size.height,
@@ -58,14 +59,53 @@ impl<'a> GpuWrapper<'a> {
 
         surface.configure(&device, &config);
 
+        let uniform_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("uniform data"),
+            size: 8,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::StorageTexture {
+                        access: StorageTextureAccess::WriteOnly,
+                        format: TextureFormat::Bgra8Unorm,
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
-            layout: None,
+            layout: Some(&pipeline_layout),
             module: &shader,
             entry_point: "pixel_shader",
             compilation_options: Default::default(),
@@ -77,12 +117,15 @@ impl<'a> GpuWrapper<'a> {
             queue,
             pipeline,
             window,
-            surface
+            surface,
+            uniform_buffer
         }
     }
 
     pub fn call_shader(&self) {
+        let size = self.window.inner_size();
         let bind_group_layout = self.pipeline.get_bind_group_layout(0);
+
         let tex = self.surface.get_current_texture().unwrap();
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -91,6 +134,10 @@ impl<'a> GpuWrapper<'a> {
                 BindGroupEntry {
                     binding: 0,
                     resource: TextureView(&tex.texture.create_view(&TextureViewDescriptor::default())),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: self.uniform_buffer.as_entire_binding()
                 }
             ],
         });
@@ -104,9 +151,10 @@ impl<'a> GpuWrapper<'a> {
             });
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            cpass.dispatch_workgroups(self.window.inner_size().width, self.window.inner_size().height, 1);
+            cpass.dispatch_workgroups(size.width, size.height, 1);
         }
 
+        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[size.width, size.height]));
         self.queue.submit(Some(encoder.finish()));
         tex.present();
     }
