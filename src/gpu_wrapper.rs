@@ -1,4 +1,4 @@
-use wgpu::{BindGroupEntry, BindingResource, ComputePipeline, Device, Instance, InstanceDescriptor, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor};
+use wgpu::{BindGroupEntry, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
 
@@ -32,7 +32,7 @@ impl<'a> GpuWrapper<'a> {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: wgpu::Features::empty(),
+                    required_features: Features::BGRA8UNORM_STORAGE,
                     required_limits: wgpu::Limits::downlevel_defaults(),
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
                 },
@@ -43,16 +43,10 @@ impl<'a> GpuWrapper<'a> {
 
         let surface_caps = surface.get_capabilities(&adapter);
 
-        // First srgb one or just the first one
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
+        let surface_format = TextureFormat::Bgra8Unorm;
 
         let config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING,
             format: surface_format,
             width: size.width,
             height: size.height,
@@ -96,10 +90,7 @@ impl<'a> GpuWrapper<'a> {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: TextureView(&tex.texture.create_view(&TextureViewDescriptor {
-                        format: Some(TextureFormat::Rgba8Unorm),
-                        ..Default::default()
-                    })),
+                    resource: TextureView(&tex.texture.create_view(&TextureViewDescriptor::default())),
                 }
             ],
         });
@@ -113,9 +104,10 @@ impl<'a> GpuWrapper<'a> {
             });
             cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            cpass.dispatch_workgroups(640, 480, 1);
+            cpass.dispatch_workgroups(self.window.inner_size().width, self.window.inner_size().height, 1);
         }
 
         self.queue.submit(Some(encoder.finish()));
+        tex.present();
     }
 }
