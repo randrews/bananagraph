@@ -1,10 +1,6 @@
 mod gpu_wrapper;
 mod window_geometry;
 
-use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
-use wgpu::{BufferAsyncError, Maintain};
-use wgpu::util::DownloadBuffer;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{Event, WindowEvent};

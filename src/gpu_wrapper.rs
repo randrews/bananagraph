@@ -1,4 +1,4 @@
-use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
 use crate::window_geometry::WindowGeometry;
