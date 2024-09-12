@@ -1,6 +1,7 @@
-use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayout, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
+use crate::window_geometry::WindowGeometry;
 
 pub struct GpuWrapper<'a> {
     device: Device,
@@ -13,7 +14,6 @@ pub struct GpuWrapper<'a> {
 
 impl<'a> GpuWrapper<'a> {
     pub async fn new(window: &'a Window) -> Self {
-        let size = window.inner_size();
         let instance = Instance::new(InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -46,6 +46,7 @@ impl<'a> GpuWrapper<'a> {
 
         let surface_format = TextureFormat::Bgra8Unorm;
 
+        let size = window.inner_size();
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
             format: surface_format,
@@ -61,7 +62,7 @@ impl<'a> GpuWrapper<'a> {
 
         let uniform_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("uniform data"),
-            size: 8,
+            size: size_of::<WindowGeometry>() as BufferAddress,
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -124,6 +125,8 @@ impl<'a> GpuWrapper<'a> {
 
     pub fn call_shader(&self) {
         let size = self.window.inner_size();
+        let geometry = WindowGeometry::new(size, None);
+
         let bind_group_layout = self.pipeline.get_bind_group_layout(0);
 
         let tex = self.surface.get_current_texture().unwrap();
@@ -154,7 +157,7 @@ impl<'a> GpuWrapper<'a> {
             cpass.dispatch_workgroups(size.width, size.height, 1);
         }
 
-        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[size.width, size.height]));
+        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&geometry));
         self.queue.submit(Some(encoder.finish()));
         tex.present();
     }
