@@ -1,4 +1,4 @@
-use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Limits, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
 use crate::window_geometry::WindowGeometry;
@@ -30,12 +30,21 @@ impl<'a> GpuWrapper<'a> {
             .await
             .unwrap();
 
+        // We're fine with downlevel in _most_ cases but we wanna be able to
+        // max out the window on a big monitor, and our Surface is also a Texture
+        // because we're just outputting directly to it. So we'll open that up a
+        // little bit:
+        let limits = Limits {
+            max_texture_dimension_2d: 4096,
+            ..Limits::downlevel_defaults()
+        };
+
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
                     required_features: Features::BGRA8UNORM_STORAGE,
-                    required_limits: wgpu::Limits::downlevel_defaults(),
+                    required_limits: limits,
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
                 },
                 None,
@@ -127,6 +136,7 @@ impl<'a> GpuWrapper<'a> {
 
     pub fn handle_resize(&mut self) {
         let size = self.window.inner_size();
+        println!("{:?}", size);
         let surface_caps = self.surface.get_capabilities(&self.adapter);
         let surface_format = TextureFormat::Bgra8Unorm;
         let config = SurfaceConfiguration {
