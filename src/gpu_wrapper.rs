@@ -1,4 +1,4 @@
-use wgpu::{BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::window::Window;
 use crate::window_geometry::WindowGeometry;
@@ -6,6 +6,7 @@ use crate::window_geometry::WindowGeometry;
 pub struct GpuWrapper<'a> {
     device: Device,
     queue: Queue,
+    adapter: Adapter,
     pipeline: ComputePipeline,
     window: &'a Window,
     surface: Surface<'a>,
@@ -114,6 +115,7 @@ impl<'a> GpuWrapper<'a> {
         });
 
         Self {
+            adapter,
             device,
             queue,
             pipeline,
@@ -121,6 +123,24 @@ impl<'a> GpuWrapper<'a> {
             surface,
             uniform_buffer
         }
+    }
+
+    pub fn handle_resize(&mut self) {
+        let size = self.window.inner_size();
+        let surface_caps = self.surface.get_capabilities(&self.adapter);
+        let surface_format = TextureFormat::Bgra8Unorm;
+        let config = SurfaceConfiguration {
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: surface_caps.present_modes[0],
+            desired_maximum_frame_latency: 2,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+        };
+
+        self.surface.configure(&self.device, &config);
     }
 
     pub fn call_shader(&self) {

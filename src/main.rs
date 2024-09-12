@@ -13,10 +13,10 @@ pub async fn run_window() -> Result<(), EventLoopError> {
         .with_title("The Thing")
         .with_inner_size(LogicalSize{ width: 640, height: 480 })
         .with_min_inner_size(LogicalSize { width: 640, height: 480 })
-        .with_max_inner_size(LogicalSize { width: 640, height: 480 })
+        //.with_max_inner_size(LogicalSize { width: 640, height: 480 })
         .build(&event_loop)?;
 
-    let wrapper = GpuWrapper::new(&window).await;
+    let mut wrapper = GpuWrapper::new(&window).await;
     let our_id = window.id();
 
     event_loop.run(move |event, target| {
@@ -33,6 +33,14 @@ pub async fn run_window() -> Result<(), EventLoopError> {
                 window_id,
             } if window_id == our_id => {
                 wrapper.call_shader()
+            }
+
+            // Redraw if it's redrawing time
+            Event::WindowEvent {
+                event: WindowEvent::Resized(_),
+                window_id,
+            } if window_id == our_id => {
+                wrapper.handle_resize()
             }
 
             _ => {} // toss the others
