@@ -1,5 +1,7 @@
+use std::mem::size_of;
 use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Limits, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
+use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::window_geometry::WindowGeometry;
 
@@ -52,22 +54,7 @@ impl<'a> GpuWrapper<'a> {
             .await
             .unwrap();
 
-        let surface_caps = surface.get_capabilities(&adapter);
-
-        let surface_format = TextureFormat::Bgra8Unorm;
-
-        let size = window.inner_size();
-        let config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: surface_caps.present_modes[0],
-            desired_maximum_frame_latency: 2,
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-        };
-
+        let config = Self::surface_config(&surface, &adapter, window.inner_size());
         surface.configure(&device, &config);
 
         let uniform_buffer = device.create_buffer(&BufferDescriptor {
@@ -135,22 +122,22 @@ impl<'a> GpuWrapper<'a> {
     }
 
     pub fn handle_resize(&mut self) {
-        let size = self.window.inner_size();
-        println!("{:?}", size);
-        let surface_caps = self.surface.get_capabilities(&self.adapter);
-        let surface_format = TextureFormat::Bgra8Unorm;
-        let config = SurfaceConfiguration {
+        let config = Self::surface_config(&self.surface, &self.adapter, self.window.inner_size());
+        self.surface.configure(&self.device, &config);
+    }
+
+    fn surface_config(surface: &Surface, adapter: &Adapter, size: PhysicalSize<u32>) -> SurfaceConfiguration {
+        let surface_caps = surface.get_capabilities(adapter);
+        SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
-            format: surface_format,
+            format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
-        };
-
-        self.surface.configure(&self.device, &config);
+        }
     }
 
     pub fn call_shader(&self) {
