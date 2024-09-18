@@ -1,4 +1,4 @@
-use bytemuck::{ Pod, Zeroable };
+use bytemuck::{Pod, Zeroable};
 use winit::dpi::PhysicalSize;
 
 /// Warning: head must be entirely de-assed before touching this code!
@@ -27,27 +27,21 @@ pub struct WindowGeometry {
     pub bottomright: [u32; 2],
 
     /// Unused, for alignment
-    pub dummy: [u32; 2]
+    pub dummy: [u32; 2],
 }
 
 impl WindowGeometry {
     pub fn new(size: PhysicalSize<u32>, fill: Option<[f32; 4]>) -> Self {
-        let topleft = [
-            (size.width - 640) / 2,
-            (size.height - 480) / 2
-        ];
+        let topleft = [(size.width - 640) / 2, (size.height - 480) / 2];
 
-        let bottomright = [
-            topleft[0] + 640,
-            topleft[1] + 480
-        ];
+        let bottomright = [topleft[0] + 640, topleft[1] + 480];
 
         Self {
             size: [size.width, size.height],
             topleft,
             bottomright,
             fill: fill.unwrap_or([0f32, 0f32, 0f32, 1f32]),
-            dummy: [0, 0]
+            dummy: [0, 0],
         }
     }
 }

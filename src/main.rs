@@ -1,18 +1,24 @@
 mod gpu_wrapper;
 mod window_geometry;
 
+use crate::gpu_wrapper::GpuWrapper;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{Event, WindowEvent};
-use crate::gpu_wrapper::GpuWrapper;
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
 
     let window = winit::window::WindowBuilder::new()
         .with_title("The Thing")
-        .with_inner_size(LogicalSize{ width: 640, height: 480 })
-        .with_min_inner_size(LogicalSize { width: 640, height: 480 })
+        .with_inner_size(LogicalSize {
+            width: 640,
+            height: 480,
+        })
+        .with_min_inner_size(LogicalSize {
+            width: 640,
+            height: 480,
+        })
         //.with_max_inner_size(LogicalSize { width: 640, height: 480 })
         .build(&event_loop)?;
 
@@ -25,28 +31,25 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
-            } if window_id == our_id => { target.exit(); }
+            } if window_id == our_id => {
+                target.exit();
+            }
 
             // Redraw if it's redrawing time
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,
                 window_id,
-            } if window_id == our_id => {
-                wrapper.redraw()
-            }
+            } if window_id == our_id => wrapper.redraw(),
 
             // Redraw if it's redrawing time
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 window_id,
-            } if window_id == our_id => {
-                wrapper.handle_resize()
-            }
+            } if window_id == our_id => wrapper.handle_resize(),
 
             _ => {} // toss the others
         }
     })
-
 }
 
 pub fn main() {
