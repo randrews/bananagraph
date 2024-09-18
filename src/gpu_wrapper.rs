@@ -1,6 +1,6 @@
 use std::mem::size_of;
-use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Color, ColorTargetState, ComputePipeline, ComputePipelineDescriptor, Device, Extent3d, Features, FragmentState, Instance, InstanceDescriptor, Limits, LoadOp, PipelineLayoutDescriptor, Queue, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, StoreOp, Surface, SurfaceConfiguration, Texture, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension, VertexState};
-use wgpu::util::DeviceExt;
+use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Limits, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::BindingResource::TextureView;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::window_geometry::WindowGeometry;
@@ -9,14 +9,10 @@ pub struct GpuWrapper<'a> {
     device: Device,
     queue: Queue,
     adapter: Adapter,
-    compute_pipeline: ComputePipeline,
-    render_pipeline: RenderPipeline,
+    pipeline: ComputePipeline,
     window: &'a Window,
     surface: Surface<'a>,
-    compute_texture: Texture,
-    render_texture: Texture,
-    uniform_buffer: Buffer,
-    sampler: Sampler,
+    uniform_buffer: Buffer
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -41,6 +37,7 @@ impl<'a> GpuWrapper<'a> {
         // because we're just outputting directly to it. So we'll open that up a
         // little bit:
         let limits = Limits {
+            max_texture_dimension_2d: 4096,
             ..Limits::downlevel_defaults()
         };
 
@@ -87,28 +84,12 @@ impl<'a> GpuWrapper<'a> {
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::StorageTexture {
-                        access: StorageTextureAccess::,
-                        format: TextureFormat::Bgra8Unorm,
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 2,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 }
             ],
@@ -120,7 +101,7 @@ impl<'a> GpuWrapper<'a> {
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
             module: &shader,
@@ -129,107 +110,14 @@ impl<'a> GpuWrapper<'a> {
             cache: None,
         });
 
-        // start //////////////////////////////////////
-        // Create a texture sampler with nearest neighbor
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("pixels_scaling_renderer_sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 1.0,
-            compare: None,
-            anisotropy_clamp: 1,
-            border_color: None,
-        });
-
-        let vertex_data: [[f32; 2]; 3] = [
-            // One full-screen triangle
-            // See: https://github.com/parasyte/pixels/issues/180
-            [-1.0, -1.0],
-            [3.0, -1.0],
-            [-1.0, 3.0],
-        ];
-        let vertex_data_slice = bytemuck::cast_slice(&vertex_data);
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("vertex_buffer"),
-            contents: vertex_data_slice,
-            usage: BufferUsages::VERTEX,
-        });
-        let vertex_buffer_layout = wgpu::VertexBufferLayout {
-            array_stride: (vertex_data_slice.len() / vertex_data.len()) as BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x2,
-                offset: 0,
-                shader_location: 0,
-            }],
-        };
-        // end ////////////////////////////////////////
-
-        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: None,
-            layout: None,
-            vertex: VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                compilation_options: Default::default(),
-                buffers: &[vertex_buffer_layout],
-            },
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            fragment: Some(FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                compilation_options: Default::default(),
-                targets: &[Some(ColorTargetState {
-                    format: TextureFormat::Bgra8UnormSrgb,
-                    blend: None,
-                    write_mask: Default::default(),
-                })],
-            }),
-            multiview: None,
-            cache: None,
-        });
-
-        let compute_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("compute-shader-output"),
-            size: Extent3d { width: 640, height: 480, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
-            usage: TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-
-        let render_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("fragment-shader-input"),
-            size: Extent3d { width: 640, height: 480, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Bgra8UnormSrgb,
-            usage: TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-
         Self {
             adapter,
             device,
             queue,
-            compute_pipeline: pipeline,
-            render_pipeline,
+            pipeline,
             window,
             surface,
-            compute_texture,
-            render_texture,
-            uniform_buffer,
-            sampler
+            uniform_buffer
         }
     }
 
@@ -241,7 +129,7 @@ impl<'a> GpuWrapper<'a> {
     fn surface_config(surface: &Surface, adapter: &Adapter, size: PhysicalSize<u32>) -> SurfaceConfiguration {
         let surface_caps = surface.get_capabilities(adapter);
         SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
             format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
@@ -256,7 +144,7 @@ impl<'a> GpuWrapper<'a> {
         let size = self.window.inner_size();
         let geometry = WindowGeometry::new(size, None);
 
-        let bind_group_layout = self.compute_pipeline.get_bind_group_layout(0);
+        let bind_group_layout = self.pipeline.get_bind_group_layout(0);
 
         let tex = self.surface.get_current_texture().unwrap();
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -265,52 +153,25 @@ impl<'a> GpuWrapper<'a> {
             entries: &[
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::TextureView(&self.compute_texture.create_view(&TextureViewDescriptor::default()))
+                    resource: TextureView(&tex.texture.create_view(&TextureViewDescriptor::default())),
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(&self.render_texture.create_view(&TextureViewDescriptor::default()))
-                },
-                BindGroupEntry {
-                    binding: 2,
                     resource: self.uniform_buffer.as_entire_binding()
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: BindingResource::Sampler(&self.sampler)
                 }
             ],
         });
 
-        let mut encoder= self.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder =
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: None,
                 timestamp_writes: None,
             });
-            cpass.set_pipeline(&self.compute_pipeline);
+            cpass.set_pipeline(&self.pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
             cpass.dispatch_workgroups(size.width, size.height, 1);
-        }
-
-        {
-            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &tex.texture.create_view(&Default::default()),
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: LoadOp::Clear(Color::BLACK),
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            rpass.set_pipeline(&self.render_pipeline);
-            rpass.set_bind_group(0, &bind_group, &[]);
         }
 
         self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&geometry));
