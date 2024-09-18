@@ -15,7 +15,8 @@ var<uniform> geometry: WindowGeometry;
 @compute
 @workgroup_size(1)
 fn pixel_shader(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    if (global_id.x < geometry.topleft.x || global_id.x >= geometry.bottomright.x || global_id.y < geometry.topleft.y || global_id.y >= geometry.bottomright.y) {
+    // if (global_id.x < geometry.topleft.x || global_id.x >= geometry.bottomright.x || global_id.y < geometry.topleft.y || global_id.y >= geometry.bottomright.y) {
+    if (global_id.x >= 200 || global_id.x < 100 || global_id.y >= 200 || global_id.y < 100) {
        textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), geometry.fill);
        //textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(0.1, 0.1, 0.3, 1.0));
     } else {
