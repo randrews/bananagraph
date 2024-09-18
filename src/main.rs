@@ -32,7 +32,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
                 event: WindowEvent::RedrawRequested,
                 window_id,
             } if window_id == our_id => {
-                wrapper.call_shader()
+                wrapper.call_compute_shader()
             }
 
             // Redraw if it's redrawing time

@@ -1,5 +1,5 @@
 use std::mem::size_of;
-use wgpu::{Adapter, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Limits, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
+use wgpu::{Adapter, BindGroup, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePipeline, Device, Features, Instance, InstanceDescriptor, Limits, PipelineLayoutDescriptor, Queue, RequestAdapterOptions, ShaderModule, ShaderStages, StorageTextureAccess, Surface, SurfaceConfiguration, SurfaceTexture, TextureFormat, TextureUsages, TextureViewDescriptor, TextureViewDimension};
 use wgpu::BindingResource::TextureView;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -16,7 +16,7 @@ pub struct GpuWrapper<'a> {
 }
 
 impl<'a> GpuWrapper<'a> {
-    pub async fn new(window: &'a Window) -> Self {
+    async fn create_device(window: &Window) -> (Surface, Adapter, Device, Queue) {
         let instance = Instance::new(InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -32,14 +32,7 @@ impl<'a> GpuWrapper<'a> {
             .await
             .unwrap();
 
-        // We're fine with downlevel in _most_ cases but we wanna be able to
-        // max out the window on a big monitor, and our Surface is also a Texture
-        // because we're just outputting directly to it. So we'll open that up a
-        // little bit:
-        let limits = Limits {
-            max_texture_dimension_2d: 4096,
-            ..Limits::downlevel_defaults()
-        };
+        let limits = Limits::downlevel_defaults();
 
         let (device, queue) = adapter
             .request_device(
@@ -54,21 +47,26 @@ impl<'a> GpuWrapper<'a> {
             .await
             .unwrap();
 
-        let config = Self::surface_config(&surface, &adapter, window.inner_size());
-        surface.configure(&device, &config);
+        (surface, adapter, device, queue)
+    }
 
-        let uniform_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("uniform data"),
-            size: size_of::<WindowGeometry>() as BufferAddress,
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+    fn create_buffer(device: &Device, label: &str, size: BufferAddress, usage: BufferUsages) -> Buffer {
+        device.create_buffer(&BufferDescriptor {
+            label: Some(label),
+            size,
+            usage,
             mapped_at_creation: false,
-        });
+        })
+    }
 
+    fn create_compute_pipeline(device: &Device) -> ComputePipeline {
+        // The compute shader itself, loaded from WGSL
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
 
+        // The layout for its two binds: the texture we'll render to and the uniform buffer
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -101,14 +99,25 @@ impl<'a> GpuWrapper<'a> {
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
             module: &shader,
             entry_point: "pixel_shader",
             compilation_options: Default::default(),
             cache: None,
-        });
+        })
+    }
+
+    pub async fn new(window: &'a Window) -> Self {
+        let (surface, adapter, device, queue) = Self::create_device(window).await;
+
+        let config = Self::surface_config(&surface, &adapter, window.inner_size());
+        surface.configure(&device, &config);
+
+        let uniform_buffer = Self::create_buffer(&device, "uniform-buffer", size_of::<WindowGeometry>() as BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
+
+        let pipeline = Self::create_compute_pipeline(&device);
 
         Self {
             adapter,
@@ -140,14 +149,10 @@ impl<'a> GpuWrapper<'a> {
         }
     }
 
-    pub fn call_shader(&self) {
-        let size = self.window.inner_size();
-        let geometry = WindowGeometry::new(size, None);
-
+    // The bind group for the compute pass
+    fn compute_bind_group(&self, tex: &SurfaceTexture) -> BindGroup {
         let bind_group_layout = self.pipeline.get_bind_group_layout(0);
-
-        let tex = self.surface.get_current_texture().unwrap();
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
             entries: &[
@@ -160,7 +165,22 @@ impl<'a> GpuWrapper<'a> {
                     resource: self.uniform_buffer.as_entire_binding()
                 }
             ],
-        });
+        })
+    }
+
+    // Actually write things to the binds
+    fn bind_for_compute(&self) {
+        let size = self.window.inner_size();
+        let geometry = WindowGeometry::new(size, None);
+        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&geometry));
+    }
+
+    pub fn call_compute_shader(&self) {
+        let size = self.window.inner_size();
+
+        let tex = self.surface.get_current_texture().unwrap();
+        let bind_group = self.compute_bind_group(&tex);
+        self.bind_for_compute();
 
         let mut encoder =
             self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -174,7 +194,6 @@ impl<'a> GpuWrapper<'a> {
             cpass.dispatch_workgroups(size.width, size.height, 1);
         }
 
-        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&geometry));
         self.queue.submit(Some(encoder.finish()));
         tex.present();
     }
