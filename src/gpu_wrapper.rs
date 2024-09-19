@@ -1,12 +1,12 @@
+use crate::scale_transform;
 use crate::window_geometry::WindowGeometry;
-use std::mem::size_of;
 use std::default::Default;
+use std::mem::size_of;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::BindingResource::TextureView;
 use wgpu::{Buffer, BufferUsages, Device, Texture, TextureUsages};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
-use crate::scale_transform;
 
 pub struct GpuWrapper<'a> {
     device: Device,
@@ -137,7 +137,8 @@ impl<'a> GpuWrapper<'a> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                wgpu::BindGroupLayoutEntry { // The output texture
+                wgpu::BindGroupLayoutEntry {
+                    // The output texture
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
@@ -147,7 +148,8 @@ impl<'a> GpuWrapper<'a> {
                     },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry { // The uniform buffer
+                wgpu::BindGroupLayoutEntry {
+                    // The uniform buffer
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
@@ -222,7 +224,8 @@ impl<'a> GpuWrapper<'a> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                wgpu::BindGroupLayoutEntry { // The input texture, copied from the compute's output texture
+                wgpu::BindGroupLayoutEntry {
+                    // The input texture, copied from the compute's output texture
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
@@ -232,13 +235,15 @@ impl<'a> GpuWrapper<'a> {
                     },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry { // The nearest-neighbor sampler
+                wgpu::BindGroupLayoutEntry {
+                    // The nearest-neighbor sampler
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry { // The transform matrix for the vertex shader
+                wgpu::BindGroupLayoutEntry {
+                    // The transform matrix for the vertex shader
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
@@ -363,13 +368,13 @@ impl<'a> GpuWrapper<'a> {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: self.render_uniform_buffer.as_entire_binding(),
-                }
+                },
             ],
         })
     }
 
     fn bind_for_render(&self) {
-        let PhysicalSize{ width, height} = self.window.inner_size();
+        let PhysicalSize { width, height } = self.window.inner_size();
         self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform((640, 480), (width, height))));
     }
 

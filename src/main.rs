@@ -1,6 +1,6 @@
 mod gpu_wrapper;
-mod window_geometry;
 mod scale_transform;
+mod window_geometry;
 
 use crate::gpu_wrapper::GpuWrapper;
 use winit::dpi::LogicalSize;
