@@ -9,7 +9,7 @@ struct Locals {
 
 @group(0) @binding(0) var r_tex_color: texture_2d<f32>;
 @group(0) @binding(1) var r_tex_sampler: sampler;
-//@group(0) @binding(2) var<uniform> r_locals: Locals;
+@group(0) @binding(2) var<uniform> r_locals: Locals;
 
 @vertex
 fn vs_main(
@@ -17,13 +17,11 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.tex_coord = fma(position, vec2<f32>(0.5, -0.5), vec2<f32>(0.5, 0.5));
-    //out.position = r_locals.transform * vec4<f32>(position, 0.0, 1.0);
-    out.position = vec4<f32>(position, 0.0, 1.0);
+    out.position = r_locals.transform * vec4<f32>(position, 0.0, 1.0);
     return out;
 }
 
 @fragment
 fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
-    //return vec4<f32>(0.2, 0.3, 0.4, 1.0);
     return textureSample(r_tex_color, r_tex_sampler, tex_coord);
 }
