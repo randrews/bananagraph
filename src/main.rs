@@ -11,15 +11,8 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let window = winit::window::WindowBuilder::new()
         .with_title("The Thing")
-        .with_inner_size(LogicalSize {
-            width: 640,
-            height: 480,
-        })
-        .with_min_inner_size(LogicalSize {
-            width: 640,
-            height: 480,
-        })
-        //.with_max_inner_size(LogicalSize { width: 640, height: 480 })
+        .with_inner_size(LogicalSize { width: 640, height: 480 })
+        .with_min_inner_size(LogicalSize { width: 640, height: 480 })
         .build(&event_loop)?;
 
     let mut wrapper = GpuWrapper::new(&window).await;
@@ -28,24 +21,15 @@ pub async fn run_window() -> Result<(), EventLoopError> {
     event_loop.run(move |event, target| {
         match event {
             // Exit if we click the little x
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id,
-            } if window_id == our_id => {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } if window_id == our_id => {
                 target.exit();
             }
 
             // Redraw if it's redrawing time
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                window_id,
-            } if window_id == our_id => wrapper.redraw(),
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => wrapper.redraw(),
 
             // Redraw if it's redrawing time
-            Event::WindowEvent {
-                event: WindowEvent::Resized(_),
-                window_id,
-            } if window_id == our_id => wrapper.handle_resize(),
+            Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
 
             _ => {} // toss the others
         }
