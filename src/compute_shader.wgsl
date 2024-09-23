@@ -9,8 +9,42 @@ struct WindowGeometry {
     dummy: vec2<u32>
 }
 
+struct VulcanState {
+    /// The bitmap font
+    font: array<u8, 2048>,
+
+    /// The palette
+    palette: array<u8, 16>,
+
+    /// Number of rows in the "virtual" screen
+    rows: u32,
+
+    /// Number of columns in the "virtual" screen
+    columns: u32,
+
+    /// Offset in rows from the top for the displayed area
+    row_offset: u32,
+
+    /// Offset in columns from the left for the displayed area
+    column_offset: u32,
+
+    /// The base pointer for the screen in `memory`
+    screen: u32,
+
+    /// We have to just copy the entire machine state over because otherwise we have to do the
+    /// row / column stuff on the CPU side; we can't tell exactly what region of memory to copy
+    /// without that
+    memory: array<u8, 131072>,
+
+    /// Which graphics mode we're using
+    mode: u8
+}
+
 @group(0) @binding(1)
 var<uniform> geometry: WindowGeometry;
+
+@group(0) @binding(2)
+var<uniform> state: VulcanState;
 
 @compute
 @workgroup_size(1)

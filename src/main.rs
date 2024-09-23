@@ -1,6 +1,7 @@
 mod gpu_wrapper;
 mod scale_transform;
 mod window_geometry;
+mod vulcan_state;
 
 use crate::gpu_wrapper::GpuWrapper;
 use winit::dpi::LogicalSize;

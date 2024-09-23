@@ -17,6 +17,7 @@ pub struct GpuWrapper<'a> {
     window: &'a Window,
     surface: wgpu::Surface<'a>,
     compute_uniform_buffer: Buffer,
+    vulcan_state_buffer: Buffer,
     render_uniform_buffer: Buffer,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
@@ -32,6 +33,7 @@ impl<'a> GpuWrapper<'a> {
         surface.configure(&device, &config);
 
         let compute_uniform_buffer = Self::create_buffer(&device, "compute-uniform-buffer", size_of::<WindowGeometry>() as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
+        let vulcan_state_buffer = Self::create_buffer(&device, "vulcan-state-buffer", 131072 as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
         let compute_texture = Self::create_texture(&device, "compute target texture", 640, 480, TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC);
         let render_texture = Self::create_texture(&device, "render source texture", 640, 480, TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST);
@@ -52,6 +54,7 @@ impl<'a> GpuWrapper<'a> {
             window,
             surface,
             compute_uniform_buffer,
+            vulcan_state_buffer,
             render_uniform_buffer,
             vertex_buffer,
             index_buffer,
@@ -151,6 +154,17 @@ impl<'a> GpuWrapper<'a> {
                 wgpu::BindGroupLayoutEntry {
                     // The uniform buffer
                     binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // The Vulcan state buffer
+                    binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -325,6 +339,7 @@ impl<'a> GpuWrapper<'a> {
     }
 
     // The bind group for the compute pass
+    // TODO: we may not need to create the bind groups every frame
     fn compute_bind_group(&self) -> wgpu::BindGroup {
         let bind_group_layout = self.pipeline.get_bind_group_layout(0);
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -339,6 +354,10 @@ impl<'a> GpuWrapper<'a> {
                     binding: 1,
                     resource: self.compute_uniform_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.vulcan_state_buffer.as_entire_binding(),
+                }
             ],
         })
     }
@@ -348,6 +367,7 @@ impl<'a> GpuWrapper<'a> {
         let size = self.window.inner_size();
         let geometry = WindowGeometry::new(size, None);
         self.queue.write_buffer(&self.compute_uniform_buffer, 0, bytemuck::bytes_of(&geometry));
+        // TODO: write to vulcan state buffer here
     }
 
     // The bind group for the compute pass
