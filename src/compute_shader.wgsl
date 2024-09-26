@@ -33,6 +33,7 @@ fn pixel_shader(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 }
 
+/// Mode 3
 fn gfx_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     let vulcan_row = y >> 2;
     let vulcan_col = x >> 2;
@@ -40,6 +41,7 @@ fn gfx_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     return to_color(color);
 }
 
+/// Mode 7
 fn gfx_highres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     let vulcan_row = y >> 2;
     let vulcan_col = x >> 2;
@@ -48,11 +50,13 @@ fn gfx_highres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     return to_color(color);
 }
 
+// Return the byte address of the given screen coords, taking scroll registers into account
 fn to_byte_address(reg: DisplayRegisters, x: u32, y: u32) -> u32 {
     let row_start = ((y + reg.row_offset) % reg.height) * reg.width + reg.screen;
     return ((x + reg.col_offset) % reg.width) + row_start;
 }
 
+// Read the register block and parse it into a struct for comfort
 fn read_display_registers() -> DisplayRegisters {
     let reg = DisplayRegisters(
         peek24(17u), // screen
@@ -66,6 +70,7 @@ fn read_display_registers() -> DisplayRegisters {
     return reg;
 }
 
+// Turn a byte into a color; unpack / scale RRRGGGBB into a vec4<f32>
 fn to_color(byte: u32) -> vec4<f32> {
     let blue = byte & 3;
     let green = (byte >> 2) & 7;
