@@ -20,17 +20,52 @@ struct DisplayRegisters {
 fn pixel_shader(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let mode = peek8(16u);
     let reg = read_display_registers();
+    var color: vec4<f32>;
     switch (mode) {
+        case 0u: {
+            color = text_lowres_direct(reg, global_id.x, global_id.y);
+        }
+        case 1u: {
+            color = gfx_lowres_direct(reg, global_id.x, global_id.y);
+        }
+        case 2u: {
+            color = text_highres_direct(reg, global_id.x, global_id.y);
+        }
         case 3u: {
-            textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), gfx_highres_direct(reg, global_id.x, global_id.y));
+            color = gfx_highres_direct(reg, global_id.x, global_id.y);
+        }
+        case 4u: {
+            color = text_lowres_paletted(reg, global_id.x, global_id.y);
+        }
+        case 5u: {
+            color = gfx_lowres_paletted(reg, global_id.x, global_id.y);
+        }
+        case 6u: {
+            color = text_highres_paletted(reg, global_id.x, global_id.y);
         }
         case 7u: {
-            textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), gfx_highres_paletted(reg, global_id.x, global_id.y));
+            color = gfx_highres_paletted(reg, global_id.x, global_id.y);
         }
         default: {
-            textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), vec4<f32>(0, 0.5, 0.5, 1.0));
+            color = vec4<f32>(0.3, 0.3, 0.5, 1.0);
         }
     }
+    textureStore(out_texture, vec2<u32>(global_id.x, global_id.y), color);
+}
+
+/// Mode 0
+fn text_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+}
+
+/// Mode 1
+fn gfx_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+}
+
+/// Mode 2
+fn text_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
 }
 
 /// Mode 3
@@ -39,6 +74,21 @@ fn gfx_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     let vulcan_col = x >> 2;
     let color = peek8(to_byte_address(reg, vulcan_col, vulcan_row));
     return to_color(color);
+}
+
+/// Mode 4
+fn text_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+}
+
+/// Mode 5
+fn gfx_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+}
+
+/// Mode 6
+fn text_highres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
+    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
 }
 
 /// Mode 7
