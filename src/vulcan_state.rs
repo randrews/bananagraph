@@ -55,6 +55,7 @@ pub fn random_vulcan(mode: u8) -> [u8; 131072] {
     // Set screen ptr to default
     poke(&mut buf, start + 1, 0x10000);
 
+    //buf[0x10000 + 10 + 160 .. 0x10000 + 20 + 160].copy_from_slice(&[0; 10]);
 
     buf
 }
@@ -62,7 +63,7 @@ pub fn random_vulcan(mode: u8) -> [u8; 131072] {
 fn poke(buf: &mut [u8], addr: usize, value: u32) {
     let low = (value & 0xff) as u8;
     let mid = ((value & 0xff00) >> 8) as u8;
-    let high = ((value & 0xff0000 >> 16)) as u8;
+    let high = ((value & 0xff0000) >> 16) as u8;
 
     buf[addr] = low;
     buf[addr + 1] = mid;
