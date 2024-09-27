@@ -60,7 +60,15 @@ fn text_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
 
 /// Mode 1
 fn gfx_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
-    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+    if y >= (240 - 64 * 3) && y < (240 + 64 * 3) && x >= (320 - 64 * 3) && x < (320 + 64 * 3) {
+        let vy = (y - (240 - 64 * 3)) / 3;
+        let vx = (x - (320 - 64 * 3)) / 3;
+
+        let vb = peek8(to_byte_address(reg, vx, vy));
+        return to_color(vb);
+    } else {
+        return to_color(0u);
+    }
 }
 
 /// Mode 2
@@ -83,7 +91,16 @@ fn text_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
 
 /// Mode 5
 fn gfx_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
-    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+    if y >= (240 - 64 * 3) && y < (240 + 64 * 3) && x >= (320 - 64 * 3) && x < (320 + 64 * 3) {
+        let vy = (y - (240 - 64 * 3)) / 3;
+        let vx = (x - (320 - 64 * 3)) / 3;
+
+        let index = peek8(to_byte_address(reg, vx, vy));
+        let color = peek8(reg.palette + index % 16);
+        return to_color(color);
+    } else {
+        return to_color(0u);
+    }
 }
 
 /// Mode 6

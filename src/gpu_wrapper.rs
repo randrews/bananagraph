@@ -38,7 +38,7 @@ impl<'a> GpuWrapper<'a> {
         let compute_texture = Self::create_texture(&device, "compute target texture", 640, 480, TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC);
         let render_texture = Self::create_texture(&device, "render source texture", 640, 480, TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST);
 
-        let vulcan_mem = random_vulcan(4);
+        let vulcan_mem = random_vulcan(5);
 
         let pipeline = Self::create_compute_pipeline(&device);
 
@@ -433,6 +433,7 @@ impl<'a> GpuWrapper<'a> {
     }
 
     pub fn redraw(&self) {
+        let start = std::time::Instant::now();
         let tex = self.surface.get_current_texture().unwrap();
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
@@ -442,5 +443,7 @@ impl<'a> GpuWrapper<'a> {
         self.call_render_shader(&mut encoder, &tex);
         self.queue.submit(Some(encoder.finish()));
         tex.present();
+        let end = std::time::Instant::now();
+        println!("Duration: {}", (end - start).as_micros());
     }
 }
