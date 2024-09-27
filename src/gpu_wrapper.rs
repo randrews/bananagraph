@@ -38,7 +38,7 @@ impl<'a> GpuWrapper<'a> {
         let compute_texture = Self::create_texture(&device, "compute target texture", 640, 480, TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC);
         let render_texture = Self::create_texture(&device, "render source texture", 640, 480, TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST);
 
-        let vulcan_mem = random_vulcan(6);
+        let vulcan_mem = random_vulcan(4);
 
         let pipeline = Self::create_compute_pipeline(&device);
 

@@ -55,7 +55,23 @@ fn pixel_shader(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 /// Mode 0
 fn text_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
-    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+    let vulcan_row = y >> 4;
+    let vulcan_col = x >> 4;
+
+    let addr = to_byte_address(reg, vulcan_col, vulcan_row);
+    let char_idx = peek8(addr);
+    let char_row = (y / 2) % 8;
+    let char_col = (x / 2) % 8;
+    let char_byte = peek8(reg.font + (char_idx << 3) + char_row);
+
+    let color_addr = addr + (reg.width * reg.height);
+    var color = peek8(color_addr);
+
+    if !text_pixel_set(char_col, char_byte) {
+        color = 0u;
+    }
+
+    return to_color(color);
 }
 
 /// Mode 1
@@ -100,7 +116,25 @@ fn gfx_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
 
 /// Mode 4
 fn text_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
-    return vec4<f32>(0.2, 0.3, 0.6, 1.0); // todo
+    let vulcan_row = y >> 4;
+    let vulcan_col = x >> 4;
+
+    let addr = to_byte_address(reg, vulcan_col, vulcan_row);
+    let char_idx = peek8(addr);
+    let char_row = (y / 2) % 8;
+    let char_col = (x / 2) % 8;
+    let char_byte = peek8(reg.font + (char_idx << 3) + char_row);
+
+    let color_addr = addr + (reg.width * reg.height);
+    var index = peek8(color_addr);
+
+    if text_pixel_set(char_col, char_byte) {
+        index = index & 0xf; // Set, so, fg color
+    } else {
+        index = index >> 4u; // Clear, so, bg color
+    }
+    let color = peek8(reg.palette + index % 16);
+    return to_color(color);
 }
 
 /// Mode 5
