@@ -13,6 +13,7 @@ struct DisplayRegisters {
     width: u32,
     row_offset: u32,
     col_offset: u32,
+    blank_color: u32,
 }
 
 @compute
@@ -68,10 +69,10 @@ fn text_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     var color = peek8(color_addr);
 
     if !text_pixel_set(char_col, char_byte) {
-        color = 0u;
+        return to_24_color(reg.blank_color);
+    } else {
+        return to_color(color);
     }
-
-    return to_color(color);
 }
 
 /// Mode 1
@@ -83,7 +84,7 @@ fn gfx_lowres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
         let vb = peek8(to_byte_address(reg, vx, vy));
         return to_color(vb);
     } else {
-        return to_color(0u);
+        return to_24_color(reg.blank_color);
     }
 }
 
@@ -101,9 +102,10 @@ fn text_highres_direct(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     let color_addr = addr + (reg.width * reg.height);
     var color = peek8(color_addr);
     if !text_pixel_set(char_col, char_byte) {
-        color = 0u;
+        return to_24_color(reg.blank_color);
+    } else {
+        return to_color(color);
     }
-    return to_color(color);
 }
 
 /// Mode 3
@@ -145,7 +147,7 @@ fn gfx_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
         let index = peek8(to_byte_address(reg, vx, vy));
         return palette_lookup(reg, index);
     } else {
-        return to_color(0u);
+        return to_24_color(reg.blank_color);
     }
 }
 
@@ -197,7 +199,8 @@ fn read_display_registers() -> DisplayRegisters {
         peek24(26u), // height
         peek24(29u), // width
         peek24(32u), // row_offset
-        peek24(35u) // col_offset
+        peek24(35u), // col_offset
+        peek24(38u) // blank_color
     );
     return reg;
 }

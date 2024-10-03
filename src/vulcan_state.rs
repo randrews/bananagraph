@@ -56,6 +56,9 @@ pub fn random_vulcan(mode: u8) -> [u8; 131072] {
     poke(&mut buf, start + 16, 0);
     poke(&mut buf, start + 19, 0);
 
+    // set blank color
+    poke(&mut buf, start + 22, 0x333355);
+
     // set sizes
     let (cols, rows) = match mode {
         0 | 4 => (40, 30), // low-res text
