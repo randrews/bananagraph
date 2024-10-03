@@ -133,8 +133,7 @@ fn text_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     } else {
         index = index >> 4u; // Clear, so, bg color
     }
-    let color = peek8(reg.palette + index % 16);
-    return to_color(color);
+    return palette_lookup(reg, index);
 }
 
 /// Mode 5
@@ -144,8 +143,7 @@ fn gfx_lowres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
         let vx = (x - (320 - 64 * 3)) / 3;
 
         let index = peek8(to_byte_address(reg, vx, vy));
-        let color = peek8(reg.palette + index % 16);
-        return to_color(color);
+        return palette_lookup(reg, index);
     } else {
         return to_color(0u);
     }
@@ -169,8 +167,7 @@ fn text_highres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     } else {
         index = index >> 4u; // Clear, so, bg color
     }
-    let color = peek8(reg.palette + index % 16);
-    return to_color(color);
+    return palette_lookup(reg, index);
 }
 
 /// Mode 7
@@ -178,8 +175,7 @@ fn gfx_highres_paletted(reg: DisplayRegisters, x: u32, y: u32) -> vec4<f32> {
     let vulcan_row = y >> 2;
     let vulcan_col = x >> 2;
     let index = peek8(to_byte_address(reg, vulcan_col, vulcan_row));
-    let color = peek8(reg.palette + index % 16);
-    return to_color(color);
+    return palette_lookup(reg, index);
 }
 
 fn text_pixel_set(char_col: u32, char_byte: u32) -> bool {
@@ -219,6 +215,16 @@ fn to_color(byte: u32) -> vec4<f32> {
     let scaled_red = (((red << 3) | red) << 2) | (red & 3);
 
     return vec4<f32>(f32(scaled_red) / 255.0, f32(scaled_green) / 255.0, f32(blue_scaled) / 255.0, 1.0);
+}
+
+fn palette_lookup(reg: DisplayRegisters, index: u32) -> vec4<f32> {
+    let color_word = peek24(reg.palette + 3 * (index % 16));
+    return to_24_color(color_word);
+}
+
+fn to_24_color(word: u32) -> vec4<f32> {
+    let bytes = unpack4xU8(word);
+    return vec4<f32>(f32(bytes[0]) / 255.0, f32(bytes[1]) / 255.0, f32(bytes[2]) / 255.0, 1.0);
 }
 
 // Actually returns a byte, only the low-order bit is populated
