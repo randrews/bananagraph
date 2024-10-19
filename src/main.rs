@@ -1,7 +1,8 @@
 mod gpu_wrapper;
 mod scale_transform;
 mod window_geometry;
-mod vulcan_state;
+mod sprite;
+mod texture;
 
 use std::time::{Duration, Instant};
 use crate::gpu_wrapper::GpuWrapper;
@@ -16,7 +17,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
     let window = winit::window::WindowBuilder::new()
         .with_title("The Thing")
         .with_inner_size(LogicalSize { width: 640, height: 480 })
-        .with_min_inner_size(LogicalSize { width: 640, height: 480 })
+        //.with_min_inner_size(LogicalSize { width: 640, height: 480 })
         .build(&event_loop)?;
 
     let mut wrapper = GpuWrapper::new(&window).await;

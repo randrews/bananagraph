@@ -1,30 +1,26 @@
 use crate::scale_transform;
-use crate::window_geometry::WindowGeometry;
 use std::default::Default;
-use std::mem::size_of;
+use cgmath::{point2, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::BindingResource::TextureView;
 use wgpu::{Buffer, BufferUsages, Device, Texture, TextureUsages};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
-use crate::vulcan_state::random_vulcan;
+use crate::sprite::{RawSprite, Sprite};
 
 pub struct GpuWrapper<'a> {
+    adapter: wgpu::Adapter,
     device: Device,
     queue: wgpu::Queue,
-    adapter: wgpu::Adapter,
-    pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
     window: &'a Window,
     surface: wgpu::Surface<'a>,
-    vulcan_state_buffer: Buffer,
-    render_uniform_buffer: Buffer,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    compute_texture: Texture,
-    render_texture: Texture,
+    render_uniform_buffer: Buffer,
+    instance_buffer: Buffer,
     sampler: wgpu::Sampler,
-    vulcan_mem: [u8; 131072],
+    spritesheet: crate::texture::Texture,
+    sprites: Vec<Sprite>
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -33,36 +29,32 @@ impl<'a> GpuWrapper<'a> {
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         surface.configure(&device, &config);
 
-        let vulcan_state_buffer = Self::create_buffer(&device, "vulcan-state-buffer", 131072 as wgpu::BufferAddress, BufferUsages::STORAGE | BufferUsages::COPY_DST);
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
-        let compute_texture = Self::create_texture(&device, "compute target texture", 640, 480, TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC);
-        let render_texture = Self::create_texture(&device, "render source texture", 640, 480, TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST);
-
-        let vulcan_mem = random_vulcan(5);
-
-        let pipeline = Self::create_compute_pipeline(&device);
+        let instance_buffer = Self::create_buffer(&device, "instance buffer", size_of::<Sprite>() as wgpu::BufferAddress, BufferUsages::VERTEX | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
         let index_buffer = Self::create_index_buffer(&device);
         let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout);
         let sampler = Self::create_sampler(&device);
 
+        let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
+
+        let sprites = vec![Sprite::new(point2(139, 130), point2(42, 60), spritesheet.size)];
+
         Self {
             adapter,
             device,
             queue,
-            pipeline,
             render_pipeline,
             window,
             surface,
-            vulcan_state_buffer,
-            render_uniform_buffer,
             vertex_buffer,
             index_buffer,
-            compute_texture,
-            render_texture,
+            render_uniform_buffer,
+            instance_buffer,
             sampler,
-            vulcan_mem,
+            spritesheet,
+            sprites,
         }
     }
 
@@ -131,63 +123,12 @@ impl<'a> GpuWrapper<'a> {
         })
     }
 
-    fn create_compute_pipeline(device: &Device) -> wgpu::ComputePipeline {
-        // The compute shader itself, loaded from WGSL
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("compute_shader.wgsl").into()),
-        });
-
-        // The layout for its two binds: the texture we'll render to and the uniform buffer
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    // The output texture
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture {
-                        access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: wgpu::TextureFormat::Bgra8Unorm,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    // The Vulcan state buffer
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: None,
-            layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
-            module: &shader,
-            entry_point: "pixel_shader",
-            compilation_options: Default::default(),
-            cache: None,
-        })
-    }
-
     fn create_vertex_buffer(device: &Device) -> (Buffer, wgpu::VertexBufferLayout) {
-        let vertex_data: [[f32; 2]; 4] = [
-            // There's an option here we're not using: essentially we could render one
-            // triangle, but that triangle could be huge and overlap the entire window.
-            // See: https://github.com/parasyte/pixels/issues/180
-            // Reason I'm not doing it is it violates the Vulcan "straightforwardness"
-            // principle.
-            [-1.0, -1.0],
-            [-1.0, 1.0],
-            [1.0, 1.0],
-            [1.0, -1.0],
+        let vertex_data: [[f32; 3]; 4] = [
+            [-1.0, -1.0, 1.0],
+            [-1.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [1.0, -1.0, 1.0],
         ];
         let vertex_data_slice = bytemuck::cast_slice(&vertex_data);
 
@@ -195,7 +136,7 @@ impl<'a> GpuWrapper<'a> {
             array_stride: (vertex_data_slice.len() / vertex_data.len()) as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x2,
+                format: wgpu::VertexFormat::Float32x3,
                 offset: 0,
                 shader_location: 0,
             }],
@@ -214,7 +155,8 @@ impl<'a> GpuWrapper<'a> {
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("index bfr"),
             // Two counterclockwise triangles
-            contents: bytemuck::cast_slice(&[0, 2, 1, 0, 3, 2]),
+            //contents: bytemuck::cast_slice(&[0, 2, 1, 0, 3, 2]),
+            contents: bytemuck::cast_slice(Vec::from_iter(0..6).as_slice()),
             usage: BufferUsages::INDEX,
         })
     }
@@ -230,21 +172,20 @@ impl<'a> GpuWrapper<'a> {
             label: None,
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    // The input texture, copied from the compute's output texture
+                    // The nearest-neighbor sampler
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: Default::default(),
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    // The nearest-neighbor sampler
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    ty: wgpu::BindingType::Texture {
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true }
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
@@ -268,7 +209,7 @@ impl<'a> GpuWrapper<'a> {
                 module: &shader,
                 entry_point: "vs_main",
                 compilation_options: Default::default(),
-                buffers: &[vertex_buffer_layout],
+                buffers: &[vertex_buffer_layout, RawSprite::desc()],
             },
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -330,32 +271,6 @@ impl<'a> GpuWrapper<'a> {
     }
 
     // The bind group for the compute pass
-    // TODO: we may not need to create the bind groups every frame
-    fn compute_bind_group(&self) -> wgpu::BindGroup {
-        let bind_group_layout = self.pipeline.get_bind_group_layout(0);
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: TextureView(&self.compute_texture.create_view(&wgpu::TextureViewDescriptor::default())),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: self.vulcan_state_buffer.as_entire_binding(),
-                },
-            ],
-        })
-    }
-
-    // Actually write things to the binds
-    fn bind_for_compute(&self) {
-        let size = self.window.inner_size();
-        self.queue.write_buffer(&self.vulcan_state_buffer, 0, &self.vulcan_mem);
-    }
-
-    // The bind group for the compute pass
     fn render_bind_group(&self) -> wgpu::BindGroup {
         let bind_group_layout = self.render_pipeline.get_bind_group_layout(0);
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -364,11 +279,11 @@ impl<'a> GpuWrapper<'a> {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: TextureView(&self.render_texture.create_view(&wgpu::TextureViewDescriptor::default())),
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::TextureView(&self.spritesheet.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -381,36 +296,8 @@ impl<'a> GpuWrapper<'a> {
     fn bind_for_render(&self) {
         let PhysicalSize { width, height } = self.window.inner_size();
         self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform((640, 480), (width, height))));
-    }
-
-    fn copy_texture_to_texture(&self, encoder: &mut wgpu::CommandEncoder) {
-        encoder.copy_texture_to_texture(
-            wgpu::ImageCopyTexture {
-                texture: &self.compute_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: Default::default(),
-            },
-            wgpu::ImageCopyTexture {
-                texture: &self.render_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: Default::default(),
-            },
-            wgpu::Extent3d { width: 640, height: 480, depth_or_array_layers: 1 },
-        );
-    }
-
-    fn call_compute_shader(&self, encoder: &mut wgpu::CommandEncoder) {
-        let size = self.window.inner_size();
-
-        let bind_group = self.compute_bind_group();
-        self.bind_for_compute();
-
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-        cpass.set_pipeline(&self.pipeline);
-        cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups(size.width, size.height, 1);
+        let raw_sprites = self.sprites.iter().map(RawSprite::from).collect::<Vec<RawSprite>>();
+        self.queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(raw_sprites.as_slice()));
     }
 
     fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, surface: &wgpu::SurfaceTexture) {
@@ -427,9 +314,10 @@ impl<'a> GpuWrapper<'a> {
         });
         rpass.set_pipeline(&self.render_pipeline);
         rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_vertex_buffer(1, self.instance_buffer.slice(..));
         rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         rpass.set_bind_group(0, &self.render_bind_group(), &[]);
-        rpass.draw_indexed(0..6, 0, 0..2);
+        rpass.draw_indexed(0..6, 0, 0..(self.sprites.len() as u32));
     }
 
     pub fn redraw(&self) {
@@ -437,8 +325,6 @@ impl<'a> GpuWrapper<'a> {
         let tex = self.surface.get_current_texture().unwrap();
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.call_compute_shader(&mut encoder);
-        self.copy_texture_to_texture(&mut encoder);
         self.bind_for_render();
         self.call_render_shader(&mut encoder, &tex);
         self.queue.submit(Some(encoder.finish()));
