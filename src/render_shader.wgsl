@@ -21,36 +21,21 @@ struct Sprite {
 
 @vertex
 fn vs_main(
-    @builtin(vertex_index) index: u32,
-    @location(0) position: vec2<f32>,
+    @location(0) position: vec2<f32>, // A point in world coords: -1..1, +y is up
     sprite: Sprite
 ) -> VertexOutput {
     var out: VertexOutput;
 
     var transform = mat3x3<f32>(sprite.transform_i, sprite.transform_j, sprite.transform_k);
-    var sprite_unit = array<vec2f, 6>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(0.0, 1.0),
-        vec2<f32>(1.0, 0.0),
 
-        vec2<f32>(1.0, 0.0),
-        vec2<f32>(0.0, 1.0),
-        vec2<f32>(1.0, 1.0),
-    );
+    out.position = locals.transform * vec4f(position, 0.0, 1.0);
 
-    var screen_unit = array<vec2f, 6>(
-        vec2<f32>(-1.0, 1.0),
-        vec2<f32>(-1.0, -1.0),
-        vec2<f32>(1.0, 1.0),
+    // Convert from world coords to texture coords
+    let c = fma(position, vec2f(0.5, -0.5), vec2f(0.5, 0.5));
 
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(-1.0, -1.0),
-        vec2<f32>(1.0, -1.0)
-    );
+    // Transform the now-texture-coords unit square into the sprite rect
+    out.tex_coord = fma(c, sprite.size, sprite.origin);
 
-    out.position = locals.transform * vec4f(screen_unit[index], 0.0, 1.0);
-    let p = sprite_unit[index];
-    out.tex_coord = fma(p, sprite.size, sprite.origin);
     return out;
 }
 

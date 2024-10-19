@@ -124,11 +124,11 @@ impl<'a> GpuWrapper<'a> {
     }
 
     fn create_vertex_buffer(device: &Device) -> (Buffer, wgpu::VertexBufferLayout) {
-        let vertex_data: [[f32; 3]; 4] = [
-            [-1.0, -1.0, 1.0],
-            [-1.0, 1.0, 1.0],
-            [1.0, 1.0, 1.0],
-            [1.0, -1.0, 1.0],
+        let vertex_data: [[f32; 2]; 4] = [
+            [-1.0, -1.0],
+            [-1.0, 1.0],
+            [1.0, 1.0],
+            [1.0, -1.0],
         ];
         let vertex_data_slice = bytemuck::cast_slice(&vertex_data);
 
@@ -136,7 +136,7 @@ impl<'a> GpuWrapper<'a> {
             array_stride: (vertex_data_slice.len() / vertex_data.len()) as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[wgpu::VertexAttribute {
-                format: wgpu::VertexFormat::Float32x3,
+                format: wgpu::VertexFormat::Float32x2,
                 offset: 0,
                 shader_location: 0,
             }],
@@ -155,8 +155,7 @@ impl<'a> GpuWrapper<'a> {
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("index bfr"),
             // Two counterclockwise triangles
-            //contents: bytemuck::cast_slice(&[0, 2, 1, 0, 3, 2]),
-            contents: bytemuck::cast_slice(Vec::from_iter(0..6).as_slice()),
+            contents: bytemuck::cast_slice(&[0, 2, 1, 0, 3, 2]),
             usage: BufferUsages::INDEX,
         })
     }
