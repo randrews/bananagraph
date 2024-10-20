@@ -31,10 +31,14 @@ impl<'a> GpuWrapper<'a> {
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
 
+        let crown = Sprite::new((664, 87).into(), (16, 16).into(), spritesheet.size.into(), (640, 480).into());
+        let card = Sprite::new((139, 130).into(), (42, 60).into(), spritesheet.size.into(), (640, 480).into());
         let sprites = vec![
-            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(0, -16)),
-            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(16, 0)),
-            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(100, -100)),
+            crown.translate((0.0, 16.0).into()),
+            crown.translate((16.0, 0.0).into()).scale((2.0, 2.0).into()),
+            crown.translate((100.0, 100.0).into()).scale((4.0, 4.0).into()).translate((-6.0, -6.0).into()),
+            crown.translate((100.0, 100.0).into()),
+            card.translate((50.0, 50.0).into())
         ];
 
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
@@ -127,10 +131,10 @@ impl<'a> GpuWrapper<'a> {
 
     fn create_vertex_buffer(device: &Device) -> (Buffer, wgpu::VertexBufferLayout) {
         let vertex_data: [[f32; 2]; 4] = [
-            [-1.0, -1.0],
-            [-1.0, 1.0],
+            [0.0, 1.0],
+            [0.0, 0.0],
+            [1.0, 0.0],
             [1.0, 1.0],
-            [1.0, -1.0],
         ];
         let vertex_data_slice = bytemuck::cast_slice(&vertex_data);
 
@@ -325,7 +329,8 @@ impl<'a> GpuWrapper<'a> {
         rpass.set_pipeline(&self.render_pipeline);
         rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
 
-        rpass.set_vertex_buffer(1, self.create_instance_buffer().slice(..));
+        let instance_buffer = self.create_instance_buffer();
+        rpass.set_vertex_buffer(1, instance_buffer.slice(..));
 
         rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         rpass.set_bind_group(0, &self.render_bind_group(), &[]);

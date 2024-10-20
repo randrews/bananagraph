@@ -1,12 +1,11 @@
-use cgmath::{ElementWise, Matrix3, Point2, SquareMatrix};
+use cgmath::{ElementWise, Matrix3, Point2, SquareMatrix, Vector2};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-#[repr(C)]
 pub struct Sprite {
     transform: Matrix3<f32>,
-    size: Point2<u32>,
+    size: Vector2<u32>,
     origin: Point2<u32>,
-    texture_size: Point2<u32>
+    texture_size: Vector2<u32>
 }
 
 #[derive(Copy, Clone, PartialEq, Debug, bytemuck::Zeroable, bytemuck::Pod)]
@@ -21,7 +20,6 @@ pub struct RawSprite {
 
 impl From<&Sprite> for RawSprite {
     fn from(value: &Sprite) -> Self {
-        //let [transform_i, transform_j, transform_k] = [value.transform.x.into(), value.transform.y.into(), value.transform.z.into()];
         let [transform_i, transform_j, transform_k] = value.transform.into();
         let fsize = Point2::new(value.size.x as f32, value.size.y as f32);
         let forigin = Point2::new(value.origin.x as f32, value.origin.y as f32);
@@ -41,23 +39,41 @@ impl From<&Sprite> for RawSprite {
 }
 
 impl Sprite {
-    pub fn new(origin: Point2<u32>, size: Point2<u32>, texture_size: Point2<u32>, pos: Point2<i32>) -> Self {
+    pub fn new(origin: Point2<u32>, size: Vector2<u32>, texture_size: Vector2<u32>, world_size: Vector2<u32>) -> Self {
         // This transform shows the sprite at 1:1 pixel scale, if you assume the window is 640x480
-        let scale_transform = Matrix3::new(
-            (size.x as f32) / 640.0, 0.0, 0.0,
-            0.0, (size.y as f32) / 480.0, 0.0,
+        let transform = Matrix3::new(
+            (size.x as f32) / (world_size.x as f32), 0.0, 0.0,
+            0.0, (size.y as f32) / (world_size.y as f32), 0.0,
             0.0, 0.0, 1.0
         );
 
-        let translation = Matrix3::from_translation((-(320.0 - (size.x / 2) as f32) / 320.0, (240.0 - (size.y / 2) as f32) / 240.0).into());
-
-        let t2 = Matrix3::from_translation((pos.x as f32 / 320.0, pos.y as f32 / 240.0).into());
-
         Self {
-            transform: t2 * translation * scale_transform,
+            transform,
             origin,
             size,
             texture_size
+        }
+    }
+
+    pub fn scale(self, factor: Vector2<f32>) -> Self {
+        // For some reason cgmath doesn't have a helper for nonuniform scaling?
+        let scale = Matrix3::new(
+            factor.x, 0.0, 0.0,
+            0.0, factor.y, 0.0,
+            0.0, 0.0, 1.0
+        );
+
+        Self {
+            transform: self.transform * scale,
+            ..self
+        }
+    }
+
+    pub fn translate(self, delta: Vector2<f32>) -> Self {
+        let scaled_vec = Vector2::new(delta.x / self.size.x as f32, delta.y / self.size.y as f32);
+        Self {
+            transform: self.transform * Matrix3::from_translation(scaled_vec),
+            ..self
         }
     }
 }

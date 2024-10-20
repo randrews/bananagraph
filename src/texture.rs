@@ -1,4 +1,4 @@
-use cgmath::{point2, Point2};
+use cgmath::{point2, Point2, Vector2};
 use wgpu::{AddressMode, Device, Extent3d, FilterMode, ImageCopyTexture, ImageDataLayout, Queue, Sampler, SamplerDescriptor, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
 use image::{DynamicImage, GenericImageView, ImageError};
 
@@ -6,7 +6,7 @@ pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: TextureView,
     pub sampler: Sampler,
-    pub size: Point2<u32>
+    pub size: Vector2<u32>
 }
 
 impl Texture {
@@ -64,6 +64,6 @@ impl Texture {
             size,
         );
 
-        Self { texture, view, sampler, size: point2(dimensions.0, dimensions.1) }
+        Self { texture, view, sampler, size: Vector2::new(dimensions.0, dimensions.1) }
     }
 }
