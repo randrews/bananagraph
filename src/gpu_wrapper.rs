@@ -1,6 +1,7 @@
 use crate::scale_transform;
 use std::default::Default;
-use cgmath::{point2, Point2};
+use std::ops::Mul;
+use cgmath::{point2, point3, EuclideanSpace, Matrix3, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{Buffer, BufferUsages, Device, Texture, TextureUsages};
 use winit::dpi::PhysicalSize;
@@ -17,7 +18,6 @@ pub struct GpuWrapper<'a> {
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     render_uniform_buffer: Buffer,
-    instance_buffer: Buffer,
     sampler: wgpu::Sampler,
     spritesheet: crate::texture::Texture,
     sprites: Vec<Sprite>
@@ -29,17 +29,20 @@ impl<'a> GpuWrapper<'a> {
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         surface.configure(&device, &config);
 
+        let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
+
+        let sprites = vec![
+            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(0, -16)),
+            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(16, 0)),
+            Sprite::new(point2(664, 87), point2(16, 16), spritesheet.size, point2(100, -100)),
+        ];
+
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
-        let instance_buffer = Self::create_buffer(&device, "instance buffer", size_of::<Sprite>() as wgpu::BufferAddress, BufferUsages::VERTEX | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
         let index_buffer = Self::create_index_buffer(&device);
         let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout);
         let sampler = Self::create_sampler(&device);
-
-        let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
-
-        let sprites = vec![Sprite::new(point2(139, 130), point2(42, 60), spritesheet.size)];
 
         Self {
             adapter,
@@ -51,7 +54,6 @@ impl<'a> GpuWrapper<'a> {
             vertex_buffer,
             index_buffer,
             render_uniform_buffer,
-            instance_buffer,
             sampler,
             spritesheet,
             sprites,
@@ -295,8 +297,17 @@ impl<'a> GpuWrapper<'a> {
     fn bind_for_render(&self) {
         let PhysicalSize { width, height } = self.window.inner_size();
         self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform((640, 480), (width, height))));
+    }
+
+    fn create_instance_buffer(&self) -> Buffer {
         let raw_sprites = self.sprites.iter().map(RawSprite::from).collect::<Vec<RawSprite>>();
-        self.queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(raw_sprites.as_slice()));
+        self.device.create_buffer_init(
+            &BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&raw_sprites),
+                usage: BufferUsages::VERTEX,
+            }
+        )
     }
 
     fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, surface: &wgpu::SurfaceTexture) {
@@ -313,7 +324,9 @@ impl<'a> GpuWrapper<'a> {
         });
         rpass.set_pipeline(&self.render_pipeline);
         rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        rpass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+
+        rpass.set_vertex_buffer(1, self.create_instance_buffer().slice(..));
+
         rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         rpass.set_bind_group(0, &self.render_bind_group(), &[]);
         rpass.draw_indexed(0..6, 0, 0..(self.sprites.len() as u32));

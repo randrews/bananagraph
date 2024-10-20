@@ -19,6 +19,16 @@ struct Sprite {
 @group(0) @binding(1) var spritesheet: texture_2d<f32>;
 @group(0) @binding(2) var<uniform> locals: Locals;
 
+// A transform matrix to convert from corners-of-the-world (-1..1, +y is up) to
+// corners-of-the-texture (0..1, +y is down, like god intended).
+// Note also that this is in a weird order, because the param order for mat3x3
+// is column-major
+const world_to_texture: mat3x3<f32> = mat3x3<f32>(
+    0.5, 0.0, 0.0,
+    0.0, -0.5, 0.0,
+    0.5, 0.5, 1.0
+);
+
 @vertex
 fn vs_main(
     @location(0) position: vec2<f32>, // A point in world coords: -1..1, +y is up
@@ -28,13 +38,12 @@ fn vs_main(
 
     var transform = mat3x3<f32>(sprite.transform_i, sprite.transform_j, sprite.transform_k);
 
-    out.position = locals.transform * vec4f(position, 0.0, 1.0);
+    let pt = transform * vec3f(position, 1.0);
+    out.position = locals.transform * vec4f(pt, 1.0);
 
-    // Convert from world coords to texture coords
-    let c = fma(position, vec2f(0.5, -0.5), vec2f(0.5, 0.5));
-
-    // Transform the now-texture-coords unit square into the sprite rect
-    out.tex_coord = fma(c, sprite.size, sprite.origin);
+    // Convert the world-coord-square into the rectangle of the actual sprite
+    let c = world_to_texture * vec3f(position, 1.0);
+    out.tex_coord = fma(vec2f(c.x, c.y), sprite.size, sprite.origin);
 
     return out;
 }

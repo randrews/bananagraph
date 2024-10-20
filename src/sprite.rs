@@ -21,6 +21,7 @@ pub struct RawSprite {
 
 impl From<&Sprite> for RawSprite {
     fn from(value: &Sprite) -> Self {
+        //let [transform_i, transform_j, transform_k] = [value.transform.x.into(), value.transform.y.into(), value.transform.z.into()];
         let [transform_i, transform_j, transform_k] = value.transform.into();
         let fsize = Point2::new(value.size.x as f32, value.size.y as f32);
         let forigin = Point2::new(value.origin.x as f32, value.origin.y as f32);
@@ -40,9 +41,20 @@ impl From<&Sprite> for RawSprite {
 }
 
 impl Sprite {
-    pub fn new(origin: Point2<u32>, size: Point2<u32>, texture_size: Point2<u32>) -> Self {
+    pub fn new(origin: Point2<u32>, size: Point2<u32>, texture_size: Point2<u32>, pos: Point2<i32>) -> Self {
+        // This transform shows the sprite at 1:1 pixel scale, if you assume the window is 640x480
+        let scale_transform = Matrix3::new(
+            (size.x as f32) / 640.0, 0.0, 0.0,
+            0.0, (size.y as f32) / 480.0, 0.0,
+            0.0, 0.0, 1.0
+        );
+
+        let translation = Matrix3::from_translation((-(320.0 - (size.x / 2) as f32) / 320.0, (240.0 - (size.y / 2) as f32) / 240.0).into());
+
+        let t2 = Matrix3::from_translation((pos.x as f32 / 320.0, pos.y as f32 / 240.0).into());
+
         Self {
-            transform: Matrix3::identity(),
+            transform: t2 * translation * scale_transform,
             origin,
             size,
             texture_size
@@ -53,7 +65,7 @@ impl Sprite {
 impl RawSprite {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: size_of::<Sprite>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             // We need to switch from using a step mode of Vertex to Instance
             // This means that our shaders will only change to use the next
             // instance when the shader starts processing a new instance
