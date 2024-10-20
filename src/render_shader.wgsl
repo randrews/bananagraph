@@ -47,9 +47,9 @@ fn vs_main(
     var pt = transform * vec3f(position, 1.0);
     pt = unit_to_world * pt;
     out.position = locals.transform * vec4f(pt, 1.0);
+    //out.position = vec4f(pt, 1.0);
 
     // Convert the world-coord-square into the rectangle of the actual sprite
-    //let c = world_to_texture * vec3f(position, 1.0);
     out.tex_coord = fma(position, sprite.size, sprite.origin);
 
     return out;

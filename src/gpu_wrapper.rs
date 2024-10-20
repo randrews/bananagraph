@@ -1,5 +1,6 @@
 use crate::scale_transform;
 use std::default::Default;
+use std::f32::consts::PI;
 use std::ops::Mul;
 use cgmath::{point2, point3, EuclideanSpace, Matrix3, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -31,16 +32,31 @@ impl<'a> GpuWrapper<'a> {
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
 
-        let crown = Sprite::new((664, 87).into(), (16, 16).into(), spritesheet.size.into(), (640, 480).into());
-        let card = Sprite::new((139, 130).into(), (42, 60).into(), spritesheet.size.into(), (640, 480).into());
-        let sprites = vec![
-            crown.translate((0.0, 16.0).into()),
-            crown.translate((16.0, 0.0).into()).scale((2.0, 2.0).into()),
-            crown.translate((100.0, 100.0).into()).scale((4.0, 4.0).into()).translate((-6.0, -6.0).into()),
-            crown.translate((100.0, 100.0).into()),
-            card.translate((50.0, 50.0).into())
+        let crown = Sprite::new((664, 87).into(), (16, 16).into(), spritesheet.size.into());
+        let card = Sprite::new((139, 130).into(), (42, 60).into(), spritesheet.size.into());
+        let mut sprites = vec![
+            // crown.translate((0.0, 16.0).into()),
+            // crown.translate((16.0, 0.0).into()).scale((2.0, 2.0).into()),
+            // crown.translate((100.0, 100.0).into()).scale((4.0, 4.0).into()).translate((-6.0, -6.0).into()),
+            // crown.translate((100.0, 100.0).into()),
+            //card.inv_scale((640.0, 480.0).into()).translate((50.0, 50.0).into()).size_scale(),
         ];
 
+        for n in 0..10 {
+            sprites.push(
+                card
+                    .translate((-0.5, -0.5).into())
+                    .size_scale()
+                    .rotate(10.0 * n as f32)
+                    .inv_size_scale()
+                    .translate((0.5, 0.5).into())
+
+                    .inv_scale((640.0, 480.0).into())
+
+                    .translate((n as f32 / 640.0, 0.0).into())
+                    .size_scale()
+            )
+        }
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
