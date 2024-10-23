@@ -2,7 +2,7 @@ use crate::scale_transform;
 use std::default::Default;
 use std::f32::consts::PI;
 use std::ops::Mul;
-use cgmath::{point2, point3, EuclideanSpace, Matrix3, Point2};
+use cgmath::{point2, point3, Deg, EuclideanSpace, Matrix3, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{Buffer, BufferUsages, Device, Texture, TextureUsages};
 use winit::dpi::PhysicalSize;
@@ -32,28 +32,20 @@ impl<'a> GpuWrapper<'a> {
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
 
-        let crown = Sprite::new((664, 87).into(), (16, 16).into(), spritesheet.size.into());
-        let card = Sprite::new((139, 130).into(), (42, 60).into(), spritesheet.size.into());
-        let mut sprites = vec![
-            // crown.translate((0.0, 16.0).into()),
-            // crown.translate((16.0, 0.0).into()).scale((2.0, 2.0).into()),
-            // crown.translate((100.0, 100.0).into()).scale((4.0, 4.0).into()).translate((-6.0, -6.0).into()),
-            // crown.translate((100.0, 100.0).into()),
-            //card.inv_scale((640.0, 480.0).into()).translate((50.0, 50.0).into()).size_scale(),
-        ];
+        let crown = Sprite::new((664, 87), (16, 16), spritesheet.size);
+        let card = Sprite::new((139, 130), (42, 60), spritesheet.size);
+        let mut sprites = Vec::new();
 
         for n in 0..10 {
             sprites.push(
                 card
-                    .translate((-0.5, -0.5).into())
+                    .translate((-0.5, -0.5))
                     .size_scale()
-                    .rotate(10.0 * n as f32)
+                    .rotate(Deg(10.0 * n as f32))
                     .inv_size_scale()
-                    .translate((0.5, 0.5).into())
-
-                    .inv_scale((640.0, 480.0).into())
-
-                    .translate((n as f32 / 640.0, 0.0).into())
+                    .translate((0.5, 0.5))
+                    .inv_scale((640.0, 480.0))
+                    .translate((n as f32 / 640.0, 0.0))
                     .size_scale()
             )
         }

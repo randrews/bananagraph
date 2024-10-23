@@ -39,17 +39,18 @@ impl From<&Sprite> for RawSprite {
 }
 
 impl Sprite {
-    pub fn new(origin: Point2<u32>, size: Vector2<u32>, texture_size: Vector2<u32>) -> Self {
+    pub fn new(origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>, texture_size: impl Into<Vector2<u32>>) -> Self {
         Self {
             transform: Matrix3::identity(),
-            origin,
-            size,
-            texture_size
+            origin: origin.into(),
+            size: size.into(),
+            texture_size: texture_size.into()
         }
     }
 
     /// Return a sprite with the transform matrix scaled by these factors
-    pub fn scale(self, factor: Vector2<f32>) -> Self {
+    pub fn scale(self, factor: impl Into<Vector2<f32>>) -> Self {
+        let factor = factor.into();
         // For some reason cgmath doesn't have a helper for nonuniform scaling?
         let scale = Matrix3::new(
             factor.x, 0.0, 0.0,
@@ -64,14 +65,15 @@ impl Sprite {
     }
 
     /// Return a sprite with the transform matrix scaled by the reciprocal of these factors
-    pub fn inv_scale(self, reciprocal: Vector2<f32>) -> Self {
-        self.scale((1.0 / reciprocal.x, 1.0 / reciprocal.y).into())
+    pub fn inv_scale(self, reciprocal: impl Into<Vector2<f32>>) -> Self {
+        let reciprocal = reciprocal.into();
+        self.scale((1.0 / reciprocal.x, 1.0 / reciprocal.y))
     }
 
     /// Return a sprite with the transform matrix translated by this vector
-    pub fn translate(self, delta: Vector2<f32>) -> Self {
+    pub fn translate(self, delta: impl Into<Vector2<f32>>) -> Self {
         Self {
-            transform: Matrix3::from_translation(delta) * self.transform,
+            transform: Matrix3::from_translation(delta.into()) * self.transform,
             ..self
         }
     }
@@ -79,25 +81,18 @@ impl Sprite {
     /// Return a sprite with the transform matrix scaled by the size of the sprite (in pixels
     /// from the texture)
     pub fn size_scale(self) -> Self {
-        self.scale((self.size.x as f32, self.size.y as f32).into())
+        self.scale((self.size.x as f32, self.size.y as f32))
     }
 
     /// Return a sprite with the transform matrix scaled by the reciprocal of the size of the
     /// sprite (in pixels from the texture)
     pub fn inv_size_scale(self) -> Self {
-        self.inv_scale((self.size.x as f32, self.size.y as f32).into())
+        self.inv_scale((self.size.x as f32, self.size.y as f32))
     }
 
-    pub fn rotate(self, theta: f32) -> Self {
-        let (s, c) = theta.sin_cos();
-        let rotate = Matrix3::new(
-            c, s, 0.0,
-            -s, c, 0.0,
-            0.0, 0.0, 1.0
-        );
-
+    pub fn rotate(self, theta: impl Into<Rad<f32>>) -> Self {
         Self {
-            transform: Matrix3::from_angle_z(Deg(theta)) * self.transform,
+            transform: Matrix3::from_angle_z(theta) * self.transform,
             ..self
         }
     }
