@@ -12,7 +12,8 @@ struct Sprite {
     @location(2) transform_j: vec3<f32>,
     @location(3) transform_k: vec3<f32>,
     @location(4) origin: vec2<f32>,
-    @location(5) size: vec2<f32>
+    @location(5) size: vec2<f32>,
+    @location(6) z: f32
 }
 
 @group(0) @binding(0) var spritesheet_sampler: sampler;
@@ -46,8 +47,8 @@ fn vs_main(
 
     var pt = transform * vec3f(position, 1.0);
     pt = unit_to_world * pt;
-    out.position = locals.transform * vec4f(pt, 1.0);
-    //out.position = vec4f(pt, 1.0);
+    var transformed = locals.transform * vec4f(pt, 1.0);
+    out.position = vec4f(transformed.x, transformed.y, sprite.z, 1.0);
 
     // Convert the world-coord-square into the rectangle of the actual sprite
     out.tex_coord = fma(position, sprite.size, sprite.origin);
@@ -57,5 +58,11 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
+    //return textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
+    var color: vec4<f32> = textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
+    if color.a == 0.0 {
+        discard;
+    } else {
+        return color;
+    }
 }

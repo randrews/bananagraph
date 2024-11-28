@@ -2,7 +2,8 @@ use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Sprite {
-    transform: Matrix3<f32>,
+    pub transform: Matrix3<f32>,
+    pub z: f32,
     size: Vector2<u32>,
     origin: Point2<u32>,
     texture_size: Vector2<u32>
@@ -15,7 +16,8 @@ pub struct RawSprite {
     transform_j: [f32; 3],
     transform_k: [f32; 3],
     origin: [f32; 2],
-    size: [f32; 2]
+    size: [f32; 2],
+    z: f32,
 }
 
 impl From<&Sprite> for RawSprite {
@@ -33,7 +35,8 @@ impl From<&Sprite> for RawSprite {
             transform_j,
             transform_k,
             origin,
-            size
+            size,
+            z: value.z
         }
     }
 }
@@ -41,6 +44,7 @@ impl From<&Sprite> for RawSprite {
 impl Sprite {
     pub fn new(origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>, texture_size: impl Into<Vector2<u32>>) -> Self {
         Self {
+            z: 0.0,
             transform: Matrix3::identity(),
             origin: origin.into(),
             size: size.into(),
@@ -96,6 +100,17 @@ impl Sprite {
             ..self
         }
     }
+
+    pub fn with_transform(self, transform: impl Into<Matrix3<f32>>) -> Self {
+        Self {
+            transform: transform.into(),
+            ..self
+        }
+    }
+
+    pub fn with_z(self, z: f32) -> Self {
+        Self { z, ..self }
+    }
 }
 
 impl RawSprite {
@@ -132,6 +147,11 @@ impl RawSprite {
                     shader_location: 5,
                     format: wgpu::VertexFormat::Float32x2,
                 },
+                wgpu::VertexAttribute {
+                    offset: 52,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32,
+                }
             ]
         }
     }

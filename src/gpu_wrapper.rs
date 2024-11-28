@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 use std::ops::Mul;
 use cgmath::{point2, point3, Deg, EuclideanSpace, Matrix3, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{Buffer, BufferUsages, Device, Texture, TextureUsages};
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferUsages, ColorWrites, CompareFunction, Device, LoadOp, StoreOp, Texture, TextureFormat, TextureUsages};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::sprite::{RawSprite, Sprite};
@@ -20,6 +20,7 @@ pub struct GpuWrapper<'a> {
     index_buffer: Buffer,
     render_uniform_buffer: Buffer,
     sampler: wgpu::Sampler,
+    depth_texture: crate::texture::Texture,
     spritesheet: crate::texture::Texture,
     sprites: Vec<Sprite>
 }
@@ -28,6 +29,7 @@ impl<'a> GpuWrapper<'a> {
     pub async fn new(window: &'a Window) -> Self {
         let (surface, adapter, device, queue) = Self::create_device(window).await;
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
+        let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
         surface.configure(&device, &config);
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
@@ -39,6 +41,7 @@ impl<'a> GpuWrapper<'a> {
         for n in 0..10 {
             sprites.push(
                 card
+                    .with_z(n as f32 / 50.0)
                     .translate((-0.5, -0.5))
                     .size_scale()
                     .rotate(Deg(10.0 * n as f32))
@@ -49,6 +52,8 @@ impl<'a> GpuWrapper<'a> {
                     .size_scale()
             )
         }
+        sprites.sort_by(|a, b| b.z.total_cmp(&a.z));
+
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
@@ -67,6 +72,7 @@ impl<'a> GpuWrapper<'a> {
             index_buffer,
             render_uniform_buffer,
             sampler,
+            depth_texture,
             spritesheet,
             sprites,
         }
@@ -229,16 +235,30 @@ impl<'a> GpuWrapper<'a> {
                 front_face: wgpu::FrontFace::Ccw,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Bgra8Unorm,
-                    blend: None,
-                    write_mask: Default::default(),
+                    format: TextureFormat::Bgra8Unorm,
+                    // blend: Some(wgpu::BlendState {
+                    //     color: wgpu::BlendComponent {
+                    //         src_factor: BlendFactor::SrcAlpha,
+                    //         dst_factor: BlendFactor::OneMinusSrcAlpha,
+                    //         operation: BlendOperation::Add,
+                    //     },
+                    //     alpha: BlendComponent::OVER,
+                    // }),
+                    blend: Some(BlendState::ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
                 })],
             }),
             multiview: None,
@@ -266,6 +286,7 @@ impl<'a> GpuWrapper<'a> {
 
     pub fn handle_resize(&mut self) {
         let config = Self::surface_config(&self.surface, &self.adapter, self.window.inner_size());
+        self.depth_texture = crate::texture::Texture::create_depth_texture(&self.device, &config);
         self.surface.configure(&self.device, &config);
     }
 
@@ -332,6 +353,14 @@ impl<'a> GpuWrapper<'a> {
                     store: wgpu::StoreOp::Store,
                 },
             })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             ..Default::default()
         });
         rpass.set_pipeline(&self.render_pipeline);
