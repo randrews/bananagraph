@@ -1,4 +1,4 @@
-use cgmath::{point2, Point2, Vector2};
+use cgmath::Vector2;
 use wgpu::{AddressMode, Device, Extent3d, FilterMode, ImageCopyTexture, ImageDataLayout, Queue, Sampler, SamplerDescriptor, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
 use image::{DynamicImage, GenericImageView, ImageError};
 
@@ -67,7 +67,8 @@ impl Texture {
         Self { texture, view, sampler, size: Vector2::new(dimensions.0, dimensions.1) }
     }
 
-    pub fn create_depth_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
+    /// Create a texture the size of the surface, with a given format and label
+    pub fn generic_texture(device: &Device, config: &wgpu::SurfaceConfiguration, label: Option<&str>, format: TextureFormat, usage: TextureUsages) -> Self {
         let size = Extent3d {
             width: config.width.max(1),
             height: config.height.max(1),
@@ -75,13 +76,13 @@ impl Texture {
         };
 
         let desc = wgpu::TextureDescriptor {
-            label: Some("depth texture"),
+            label,
             size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Depth32Float,
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            format,
+            usage,
             view_formats: &[],
         };
         let texture = device.create_texture(&desc);
@@ -103,5 +104,15 @@ impl Texture {
         );
 
         Self { texture, view, sampler, size: (size.width, size.height).into() }
+    }
+
+    /// Create a texture suitable for use as a depth texture
+    pub fn create_depth_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
+        Self::generic_texture(&device, &config, Some("depth texture"), TextureFormat::Depth32Float, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
+    }
+
+    /// Create a texture for the ID shader to use as its output
+    pub fn create_id_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
+        Self::generic_texture(&device, &config, Some("id texture"), TextureFormat::R32Uint, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC)
     }
 }

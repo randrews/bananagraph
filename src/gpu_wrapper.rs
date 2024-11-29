@@ -2,9 +2,11 @@ use crate::scale_transform;
 use std::default::Default;
 use std::f32::consts::PI;
 use std::ops::Mul;
+use std::sync::Arc;
 use cgmath::{point2, point3, Deg, EuclideanSpace, Matrix3, Point2};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferUsages, ColorWrites, CompareFunction, Device, LoadOp, StoreOp, Texture, TextureFormat, TextureUsages};
+use wgpu::{BlendComponent, BlendFactor, BlendOperation, BlendState, Buffer, BufferUsages, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureAspect, TextureFormat, TextureUsages};
+use wgpu::core::id::markers::CommandEncoder;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::sprite::{RawSprite, Sprite};
@@ -14,6 +16,7 @@ pub struct GpuWrapper<'a> {
     device: Device,
     queue: wgpu::Queue,
     render_pipeline: wgpu::RenderPipeline,
+    id_pipeline: wgpu::RenderPipeline,
     window: &'a Window,
     surface: wgpu::Surface<'a>,
     vertex_buffer: Buffer,
@@ -22,6 +25,8 @@ pub struct GpuWrapper<'a> {
     sampler: wgpu::Sampler,
     depth_texture: crate::texture::Texture,
     spritesheet: crate::texture::Texture,
+    id_texture: crate::texture::Texture,
+    id_buffer: Arc<Buffer>,
     sprites: Vec<Sprite>
 }
 
@@ -30,6 +35,7 @@ impl<'a> GpuWrapper<'a> {
         let (surface, adapter, device, queue) = Self::create_device(window).await;
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
+        let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
         surface.configure(&device, &config);
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
@@ -50,6 +56,7 @@ impl<'a> GpuWrapper<'a> {
                     .inv_scale((640.0, 480.0))
                     .translate((n as f32 / 640.0, 0.0))
                     .size_scale()
+                    .with_id(n + 1)
             )
         }
         sprites.sort_by(|a, b| b.z.total_cmp(&a.z));
@@ -58,7 +65,10 @@ impl<'a> GpuWrapper<'a> {
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
         let index_buffer = Self::create_index_buffer(&device);
-        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout);
+        let id_buffer = Arc::new(Self::create_id_buffer(&device, &id_texture.texture));
+        let shader = Self::create_shader(&device);
+        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader);
+        let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
         let sampler = Self::create_sampler(&device);
 
         Self {
@@ -66,6 +76,7 @@ impl<'a> GpuWrapper<'a> {
             device,
             queue,
             render_pipeline,
+            id_pipeline,
             window,
             surface,
             vertex_buffer,
@@ -73,6 +84,8 @@ impl<'a> GpuWrapper<'a> {
             render_uniform_buffer,
             sampler,
             depth_texture,
+            id_texture,
+            id_buffer,
             spritesheet,
             sprites,
         }
@@ -180,15 +193,17 @@ impl<'a> GpuWrapper<'a> {
         })
     }
 
-    fn create_render_pipeline(device: &Device, vertex_buffer_layout: wgpu::VertexBufferLayout) -> wgpu::RenderPipeline {
+    fn create_shader(device: &Device) -> ShaderModule {
         // The render shader itself, loaded from WGSL
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(include_str!("render_shader.wgsl").into()),
-        });
+        })
+    }
 
+    fn create_render_pipeline(device: &Device, vertex_buffer_layout: wgpu::VertexBufferLayout, shader: &ShaderModule) -> wgpu::RenderPipeline {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
+            label: Some("render pipeline"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     // The nearest-neighbor sampler
@@ -225,7 +240,7 @@ impl<'a> GpuWrapper<'a> {
             label: None,
             layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: shader,
                 entry_point: "vs_main",
                 compilation_options: Default::default(),
                 buffers: &[vertex_buffer_layout, RawSprite::desc()],
@@ -249,16 +264,83 @@ impl<'a> GpuWrapper<'a> {
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
-                    // blend: Some(wgpu::BlendState {
-                    //     color: wgpu::BlendComponent {
-                    //         src_factor: BlendFactor::SrcAlpha,
-                    //         dst_factor: BlendFactor::OneMinusSrcAlpha,
-                    //         operation: BlendOperation::Add,
-                    //     },
-                    //     alpha: BlendComponent::OVER,
-                    // }),
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
+                })],
+            }),
+            multiview: None,
+            cache: None,
+        })
+    }
+
+    /// Very similar to the render pipeline, but different in two ways:
+    /// One, the fragment stage uses fs_id instead of fs_main, because we want to run a different
+    /// shader. Two, the output is R32Uint, because we're just extracting one u32 out of this.
+    fn create_id_pipeline(device: &Device, vertex_buffer_layout: wgpu::VertexBufferLayout, shader: &ShaderModule) -> wgpu::RenderPipeline {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    // The nearest-neighbor sampler
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true }
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // The transform matrix for the vertex shader
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("id shader"),
+            layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: "vs_main",
+                compilation_options: Default::default(),
+                buffers: &[vertex_buffer_layout, RawSprite::desc()],
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_id",
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: TextureFormat::R32Uint,
+                    blend: None,
+                    write_mask: ColorWrites::RED,
                 })],
             }),
             multiview: None,
@@ -287,6 +369,8 @@ impl<'a> GpuWrapper<'a> {
     pub fn handle_resize(&mut self) {
         let config = Self::surface_config(&self.surface, &self.adapter, self.window.inner_size());
         self.depth_texture = crate::texture::Texture::create_depth_texture(&self.device, &config);
+        self.id_texture = crate::texture::Texture::create_id_texture(&self.device, &config);
+        self.id_buffer = Arc::new(Self::create_id_buffer(&self.device, &self.id_texture.texture));
         self.surface.configure(&self.device, &config);
     }
 
@@ -374,6 +458,84 @@ impl<'a> GpuWrapper<'a> {
         rpass.draw_indexed(0..6, 0, 0..(self.sprites.len() as u32));
     }
 
+    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                //view: &self.id_texture.texture.create_view(&Default::default()),
+                view: &self.id_texture.texture.create_view(&wgpu::TextureViewDescriptor {
+                    format: Some(TextureFormat::R32Uint),
+                    ..Default::default()
+                }),
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        });
+        rpass.set_pipeline(&self.id_pipeline);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+
+        let instance_buffer = self.create_instance_buffer();
+        rpass.set_vertex_buffer(1, instance_buffer.slice(..));
+
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.set_bind_group(0, &self.render_bind_group(), &[]);
+        rpass.draw_indexed(0..6, 0, 0..(self.sprites.len() as u32));
+    }
+
+    fn id_buffer_bytes_per_row(x: u32) -> u32 {
+        if x % (wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4) == 0 {
+            x * 4
+        } else {
+            let req_pixels_per_row = (wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / 4);
+            (x + (req_pixels_per_row - x % req_pixels_per_row)) * 4
+        }
+    }
+
+    fn create_id_buffer(device: &Device, id_texture: &Texture) -> Buffer {
+        let bpr = Self::id_buffer_bytes_per_row(id_texture.width());
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (bpr * id_texture.height()).into(),
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        })
+    }
+
+    fn read_id_texture(&self, encoder: &mut wgpu::CommandEncoder) {
+        let size = self.id_texture.size;
+        
+        let src = ImageCopyTexture {
+            texture: &self.id_texture.texture,
+            mip_level: 0,
+            origin: Default::default(),
+            aspect: Default::default(),
+        };
+        let dest = wgpu::ImageCopyBuffer {
+            buffer: &self.id_buffer,
+            layout: ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(Self::id_buffer_bytes_per_row(size.x)),
+                rows_per_image: Some(size.y),
+            },
+        };
+        encoder.copy_texture_to_buffer(src, dest, Extent3d {
+            width: size.x,
+            height: size.y,
+            depth_or_array_layers: 1,
+        });
+    }
+
     pub fn redraw(&self) {
         let start = std::time::Instant::now();
         let tex = self.surface.get_current_texture().unwrap();
@@ -381,9 +543,37 @@ impl<'a> GpuWrapper<'a> {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         self.bind_for_render();
         self.call_render_shader(&mut encoder, &tex);
+        self.call_id_shader(&mut encoder);
+        self.read_id_texture(&mut encoder);
         self.queue.submit(Some(encoder.finish()));
         tex.present();
-        let end = std::time::Instant::now();
-        println!("Duration: {}", (end - start).as_micros());
+
+        //let end = std::time::Instant::now();
+        //println!("Duration: {}", (end - start).as_micros());
+    }
+    
+    pub fn get_sprite_ids(&self) -> (Vec<u32>, u32) {
+        let capturable = self.id_buffer.clone();
+        let result: Option<Result<Vec<u32>, wgpu::BufferAsyncError>> = None;
+        let m = std::sync::Arc::new(std::sync::Mutex::new(result));
+        let m2 = m.clone();
+        
+        self.id_buffer.slice(..).map_async(wgpu::MapMode::Read, move|result| {
+            if result.is_ok() {
+                let ids: Vec<u32> = bytemuck::cast_slice(&capturable.slice(..).get_mapped_range()).to_vec();
+                capturable.unmap();
+                let _ = m.lock().unwrap().insert(Ok(ids));
+            } else {
+                let _ = m.lock().unwrap().insert(Err(result.err().unwrap()));
+            }
+        });
+
+        let result = loop {
+            if let Some(result) = m2.lock().unwrap().take() {
+                break result
+            }
+            self.device.poll(wgpu::Maintain::wait()).panic_on_timeout()
+        };
+        (result.unwrap(), Self::id_buffer_bytes_per_row(self.id_texture.size.x) / 4)
     }
 }

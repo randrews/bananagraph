@@ -6,7 +6,9 @@ pub struct Sprite {
     pub z: f32,
     size: Vector2<u32>,
     origin: Point2<u32>,
-    texture_size: Vector2<u32>
+    texture_size: Vector2<u32>,
+    override_alpha: Option<f32>,
+    id: u32
 }
 
 #[derive(Copy, Clone, PartialEq, Debug, bytemuck::Zeroable, bytemuck::Pod)]
@@ -18,6 +20,9 @@ pub struct RawSprite {
     origin: [f32; 2],
     size: [f32; 2],
     z: f32,
+    id: u32,
+    override_alpha: f32,
+    is_override_alpha: u32
 }
 
 impl From<&Sprite> for RawSprite {
@@ -36,7 +41,10 @@ impl From<&Sprite> for RawSprite {
             transform_k,
             origin,
             size,
-            z: value.z
+            z: value.z,
+            id: value.id,
+            override_alpha: value.override_alpha.unwrap_or(0.0),
+            is_override_alpha: value.override_alpha.map_or(0, |_| 1)
         }
     }
 }
@@ -48,7 +56,9 @@ impl Sprite {
             transform: Matrix3::identity(),
             origin: origin.into(),
             size: size.into(),
-            texture_size: texture_size.into()
+            texture_size: texture_size.into(),
+            override_alpha: None,
+            id: 0
         }
     }
 
@@ -111,6 +121,20 @@ impl Sprite {
     pub fn with_z(self, z: f32) -> Self {
         Self { z, ..self }
     }
+    
+    pub fn with_override_alpha(self, override_alpha: Option<f32>) -> Self {
+        Self {
+            override_alpha,
+            ..self
+        }
+    }
+
+    pub fn with_id(self, id: u32) -> Self {
+        Self {
+            id,
+            ..self
+        }
+    }
 }
 
 impl RawSprite {
@@ -151,8 +175,23 @@ impl RawSprite {
                     offset: 52,
                     shader_location: 6,
                     format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: 56,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute {
+                    offset: 60,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: 64,
+                    shader_location: 9,
+                    format: wgpu::VertexFormat::Uint32,
                 }
-            ]
+        ]
         }
     }
 }
