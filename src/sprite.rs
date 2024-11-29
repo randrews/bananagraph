@@ -1,5 +1,7 @@
 use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2};
 
+pub type SpriteId = u32;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Sprite {
     pub transform: Matrix3<f32>,
@@ -8,7 +10,7 @@ pub struct Sprite {
     origin: Point2<u32>,
     texture_size: Vector2<u32>,
     override_alpha: Option<f32>,
-    id: u32
+    id: SpriteId
 }
 
 #[derive(Copy, Clone, PartialEq, Debug, bytemuck::Zeroable, bytemuck::Pod)]
@@ -129,7 +131,7 @@ impl Sprite {
         }
     }
 
-    pub fn with_id(self, id: u32) -> Self {
+    pub fn with_id(self, id: SpriteId) -> Self {
         Self {
             id,
             ..self

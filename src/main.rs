@@ -3,6 +3,7 @@ mod scale_transform;
 mod window_geometry;
 mod sprite;
 mod texture;
+mod id_buffer;
 
 use std::time::{Duration, Instant};
 use crate::gpu_wrapper::GpuWrapper;
@@ -24,7 +25,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
     let our_id = window.id();
 
     let timer_length = Duration::from_millis(20);
-    
+
     // The mouse position is a float, but seems to still describe positions within the same coord
     // space as the window, so just floor()ing it gives you reasonable coordinates
     let mut mouse_pos: (f64, f64) = (-1f64, -1f64);
@@ -37,7 +38,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             }
 
             // Redraw if it's redrawing time
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => wrapper.redraw(),
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => { wrapper.redraw(); },
 
             // Resize if it's resizing time
             Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
@@ -64,14 +65,9 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             Event::WindowEvent {
                 window_id, event: WindowEvent::MouseInput { device_id: _, state: ElementState::Pressed, button: MouseButton::Left }
             } if window_id == our_id => {
-                let start = std::time::Instant::now();
-                println!("Mouse clicked:");
-                println!("\tPhysical: {}, {}", mouse_pos.0, mouse_pos.1);
-                let (ids, width) = wrapper.get_sprite_ids();
-                let id = ids[(width * mouse_pos.1 as u32 + mouse_pos.0 as u32) as usize];
+                let ids = wrapper.get_sprite_ids().unwrap();
+                let id = ids[mouse_pos.into()];
                 println!("Sprite id: {}", id);
-                let end = std::time::Instant::now();
-                println!("Duration: {}", (end - start).as_micros());
             }
 
             _ => {} // toss the others

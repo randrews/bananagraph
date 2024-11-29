@@ -1973,9 +1973,7 @@ dependencies = [
  "cgmath",
  "env_logger",
  "image",
- "log",
  "pollster",
- "wasm-bindgen-futures",
  "wgpu",
  "winit",
 ]
