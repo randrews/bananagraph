@@ -26,7 +26,7 @@ pub struct GpuWrapper<'a> {
     spritesheet: crate::texture::Texture,
     id_texture: crate::texture::Texture,
     id_buffer: Arc<Buffer>,
-    sprites: Vec<Sprite>
+    //sprites: Vec<Sprite>
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -38,28 +38,7 @@ impl<'a> GpuWrapper<'a> {
         surface.configure(&device, &config);
 
         let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
-
-        let crown = Sprite::new((664, 87), (16, 16), spritesheet.size);
-        let card = Sprite::new((139, 130), (42, 60), spritesheet.size);
-        let mut sprites = Vec::new();
-
-        for n in 0..10 {
-            sprites.push(
-                card
-                    .with_z(n as f32 / 50.0)
-                    .translate((-0.5, -0.5))
-                    .size_scale()
-                    .rotate(Deg(10.0 * n as f32))
-                    .inv_size_scale()
-                    .translate((0.5, 0.5))
-                    .inv_scale((640.0, 480.0))
-                    .translate((n as f32 / 640.0, 0.0))
-                    .size_scale()
-                    .with_id(n + 1)
-            )
-        }
-        sprites.sort_by(|a, b| b.z.total_cmp(&a.z));
-
+        
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
@@ -86,7 +65,6 @@ impl<'a> GpuWrapper<'a> {
             id_texture,
             id_buffer,
             spritesheet,
-            sprites,
         }
     }
 
@@ -410,8 +388,8 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over
-    fn create_instance_buffer(&self) -> Buffer {
-        let raw_sprites = self.sprites.iter().map(RawSprite::from).collect::<Vec<RawSprite>>();
+    fn create_instance_buffer(&self, sprites: Vec<Sprite>) -> Buffer {
+        let raw_sprites = sprites.iter().map(RawSprite::from).collect::<Vec<RawSprite>>();
         self.device.create_buffer_init(
             &BufferInitDescriptor {
                 label: Some("Instance Buffer"),
@@ -423,7 +401,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// Queues a call to an arbitrary shader pipeline, targeting an arbitrary texture view. It will
     /// iterate over the given instances for the unit-square-vertex-buffer.
-    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
+    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
@@ -450,22 +428,22 @@ impl<'a> GpuWrapper<'a> {
 
         rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         rpass.set_bind_group(0, &self.render_bind_group(), &[]);
-        rpass.draw_indexed(0..6, 0, 0..(self.sprites.len() as u32));
+        rpass.draw_indexed(0..6, 0, 0..num_instances);
     }
 
     /// Queues a call to the render shader, which outputs color data to the surface
-    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, surface: &wgpu::SurfaceTexture) {
-        self.call_shader(encoder, instances, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
+    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32, surface: &wgpu::SurfaceTexture) {
+        self.call_shader(encoder, instances, num_instances, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
     }
 
     /// Queues a call to the id shader, which outputs sprite ids to id_texture
-    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer) {
+    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32) {
         let target = self.id_texture.texture.create_view(&wgpu::TextureViewDescriptor {
             format: Some(TextureFormat::R32Uint),
             ..Default::default()
         });
 
-        self.call_shader(encoder, instances, &self.id_pipeline, &target);
+        self.call_shader(encoder, instances, num_instances, &self.id_pipeline, &target);
     }
 
     /// We can only copy textures to buffers that are multiples of `COPY_BYTES_PER_ROW_ALIGNMENT`
@@ -515,15 +493,16 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// Redraws the display and populates the id buffer, returning how long it took to do that.
-    pub fn redraw(&self) -> Duration {
+    pub fn redraw(&self, sprites: Vec<Sprite>) -> Duration {
         let start = std::time::Instant::now();
         let tex = self.surface.get_current_texture().unwrap();
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         self.bind_for_render();
-        let instance_buffer = self.create_instance_buffer();
-        self.call_render_shader(&mut encoder, &instance_buffer, &tex);
-        self.call_id_shader(&mut encoder, &instance_buffer);
+        let num_sprites = sprites.len() as u32;
+        let instance_buffer = self.create_instance_buffer(sprites);
+        self.call_render_shader(&mut encoder, &instance_buffer, num_sprites, &tex);
+        self.call_id_shader(&mut encoder, &instance_buffer, num_sprites);
         self.read_id_texture(&mut encoder);
         self.queue.submit(Some(encoder.finish()));
         tex.present();

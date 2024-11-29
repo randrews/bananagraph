@@ -6,11 +6,13 @@ mod texture;
 mod id_buffer;
 
 use std::time::{Duration, Instant};
+use cgmath::{Point2, Vector2};
 use crate::gpu_wrapper::GpuWrapper;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
+use crate::sprite::Sprite;
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
@@ -38,7 +40,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             }
 
             // Redraw if it's redrawing time
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => { wrapper.redraw(); },
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => { wrapper.redraw(make_sprites()); },
 
             // Resize if it's resizing time
             Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
@@ -50,7 +52,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
             // When the timer fires, redraw thw window and restart the timer (update will go here)
             Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                wrapper.redraw();
+                wrapper.redraw(make_sprites());
                 target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
             }
 
@@ -73,6 +75,31 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             _ => {} // toss the others
         }
     })
+}
+
+fn make_sprites() -> Vec<Sprite> {
+    let spritesheet_size: Vector2<u32> = (896, 256).into(); // TODO
+    let crown = Sprite::new((664, 87), (16, 16), spritesheet_size);
+    let card = Sprite::new((139, 130), (42, 60), spritesheet_size);
+    let mut sprites = Vec::new();
+
+    for n in 0..10 {
+        sprites.push(
+            card
+                .with_z(n as f32 / 50.0)
+                .translate((-0.5, -0.5))
+                .size_scale()
+                .rotate(cgmath::Deg(10.0 * n as f32))
+                .inv_size_scale()
+                .translate((0.5, 0.5))
+                .inv_scale((640.0, 480.0))
+                .translate((n as f32 / 640.0, 0.0))
+                .size_scale()
+                .with_id(n + 1)
+        )
+    }
+    sprites.sort_by(|a, b| b.z.total_cmp(&a.z));
+    sprites
 }
 
 pub fn main() {
