@@ -11,22 +11,42 @@ use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
 
 pub struct GpuWrapper<'a> {
+    // The handles to the actual GPU hardware
     adapter: wgpu::Adapter,
     device: Device,
+    
+    // A queue to set up commands for a redraw
     queue: wgpu::Queue,
+    
+    // Two render pipelines: one for the pixel data and one for
+    // sprite IDs for hit detection
     render_pipeline: wgpu::RenderPipeline,
     id_pipeline: wgpu::RenderPipeline,
+
+    // The window and surface of that window that we're rendering to
     window: &'a Window,
     surface: wgpu::Surface<'a>,
+
+    // Inputs to the render pipelines: a unit square, which we need
+    // buffers to store on the GPU, and a uniform buffer with the
+    // scale transform.
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     render_uniform_buffer: Buffer,
+
+    // The nearest-neighbor sampler for a sharp pixel effect
     sampler: wgpu::Sampler,
+
+    // A texture for the pipeline to write depth data to
     depth_texture: crate::texture::Texture,
+
+    // The textures we'll draw sprites from
     spritesheet: crate::texture::Texture,
+
+    // The texture the id pipeline outputs to, and the buffer
+    // we read them from 
     id_texture: crate::texture::Texture,
     id_buffer: Arc<Buffer>,
-    //sprites: Vec<Sprite>
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -389,7 +409,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over
     fn create_instance_buffer(&self, sprites: Vec<Sprite>) -> Buffer {
-        let raw_sprites = sprites.iter().map(RawSprite::from).collect::<Vec<RawSprite>>();
+        let raw_sprites = sprites.into_iter().map(|s| s.into_raw(self.spritesheet.size)).collect::<Vec<RawSprite>>();
         self.device.create_buffer_init(
             &BufferInitDescriptor {
                 label: Some("Instance Buffer"),

@@ -12,7 +12,7 @@ use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
-use crate::sprite::Sprite;
+use crate::sprite::{Layer, Sprite};
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
@@ -78,9 +78,8 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 }
 
 fn make_sprites() -> Vec<Sprite> {
-    let spritesheet_size: Vector2<u32> = (896, 256).into(); // TODO
-    let crown = Sprite::new((664, 87), (16, 16), spritesheet_size);
-    let card = Sprite::new((139, 130), (42, 60), spritesheet_size);
+    let crown = Sprite::new(Layer::Sprite,(664, 87), (16, 16));
+    let card = Sprite::new(Layer::Sprite,(139, 130), (42, 60));
     let mut sprites = Vec::new();
 
     for n in 0..10 {

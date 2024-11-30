@@ -2,13 +2,32 @@ use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2};
 
 pub type SpriteId = u32;
 
+/// The five spritesheets we can draw sprites from, and their intended uses
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum Layer {
+    /// The `Sprite` sheet is for general objects in the world; if you only have one sheet use this one
+    Sprite,
+    
+    /// The `Terrain` sheet is for terrain tiles
+    Terrain,
+
+    /// `Mob`s often have more animation frames, so we reserve an entire sheet for them
+    Mob,
+
+    /// The `Background` sheet is for larger images to be used as backgrounds, skyboxes, etc.
+    Background,
+
+    /// To display text, it's convenient to have one sheet set aside for a bitmap `Font`
+    Font,
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Sprite {
     pub transform: Matrix3<f32>,
     pub z: f32,
     size: Vector2<u32>,
     origin: Point2<u32>,
-    texture_size: Vector2<u32>,
+    layer: Layer,
     override_alpha: Option<f32>,
     id: SpriteId
 }
@@ -27,40 +46,39 @@ pub struct RawSprite {
     is_override_alpha: u32
 }
 
-impl From<&Sprite> for RawSprite {
-    fn from(value: &Sprite) -> Self {
-        let [transform_i, transform_j, transform_k] = value.transform.into();
-        let fsize = Point2::new(value.size.x as f32, value.size.y as f32);
-        let forigin = Point2::new(value.origin.x as f32, value.origin.y as f32);
-        let ftsize = Point2::new(value.texture_size.x as f32, value.texture_size.y as f32);
+impl Sprite {
+    pub fn new(layer: Layer, origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>) -> Self {
+        Self {
+            z: 0.0,
+            layer,
+            transform: Matrix3::identity(),
+            origin: origin.into(),
+            size: size.into(),
+            override_alpha: None,
+            id: 0
+        }
+    }
+
+    pub fn into_raw(self, texture_size: impl Into<Vector2<u32>>) -> RawSprite {
+        let [transform_i, transform_j, transform_k] = self.transform.into();
+        let fsize = Point2::new(self.size.x as f32, self.size.y as f32);
+        let forigin = Point2::new(self.origin.x as f32, self.origin.y as f32);
+        let texture_size: Vector2<u32> = texture_size.into();
+        let ftsize = Point2::new(texture_size.x as f32, texture_size.y as f32);
 
         let origin: [f32; 2] = forigin.div_element_wise(ftsize).into();
         let size: [f32; 2] = fsize.div_element_wise(ftsize).into();
 
-        Self {
+        RawSprite {
             transform_i,
             transform_j,
             transform_k,
             origin,
             size,
-            z: value.z,
-            id: value.id,
-            override_alpha: value.override_alpha.unwrap_or(0.0),
-            is_override_alpha: value.override_alpha.map_or(0, |_| 1)
-        }
-    }
-}
-
-impl Sprite {
-    pub fn new(origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>, texture_size: impl Into<Vector2<u32>>) -> Self {
-        Self {
-            z: 0.0,
-            transform: Matrix3::identity(),
-            origin: origin.into(),
-            size: size.into(),
-            texture_size: texture_size.into(),
-            override_alpha: None,
-            id: 0
+            z: self.z,
+            id: self.id,
+            override_alpha: self.override_alpha.unwrap_or(0.0),
+            is_override_alpha: self.override_alpha.map_or(0, |_| 1)
         }
     }
 
