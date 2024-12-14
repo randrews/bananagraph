@@ -1,6 +1,6 @@
 struct VertexOutput {
     @location(0) tex_coord: vec2<f32>,
-    @location(1) override_alpha: f32,
+    @location(1) tint: vec4<f32>,
     @location(2) is_override_alpha: u32,
     @location(3) id: u32,
     @builtin(position) position: vec4<f32>,
@@ -18,8 +18,7 @@ struct Sprite {
     @location(5) size: vec2<f32>,
     @location(6) z: f32,
     @location(7) id: u32,
-    @location(8) override_alpha: f32,
-    @location(9) is_override_alpha: u32
+    @location(8) tint: vec4<f32>
 }
 
 @group(0) @binding(0) var spritesheet_sampler: sampler;
@@ -60,8 +59,7 @@ const unit_to_world: mat3x3<f32> = mat3x3<f32>(
     out.tex_coord = fma(position, sprite.size, sprite.origin);
 
     // Write the alpha-override fields and the id:
-    out.override_alpha = sprite.override_alpha;
-    out.is_override_alpha = sprite.is_override_alpha;
+    out.tint = sprite.tint;
     out.id = sprite.id;
 
     return out;
@@ -72,11 +70,7 @@ const unit_to_world: mat3x3<f32> = mat3x3<f32>(
     //return textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
     var color: vec4<f32> = textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
 
-    // If we should override the alpha, do so. We override it if the original sprite had
-    // Some() as the override, and if the texture has an actual opaque pixel for this spot
-    if in.is_override_alpha != 0 && color.a > 0.0 {
-        color.a = in.override_alpha;
-    }
+    color = color * in.tint;
 
     // Alpha 0 is a special case where we just do nothing. This is _most_ of what you need
     // to make alpha blending work; the other part is that if you want more than one bit of
@@ -95,11 +89,9 @@ const unit_to_world: mat3x3<f32> = mat3x3<f32>(
 @fragment fn fs_id(in: VertexOutput) -> @location(0) u32 {
     var color: vec4<f32> = textureSample(spritesheet, spritesheet_sampler, in.tex_coord);
 
-    if in.is_override_alpha != 0 && color.a > 0.0 {
-        color.a = in.override_alpha;
-    }
+    color = color * in.tint;
 
-    if color.a == 0.0 {
+    if color.a == 0.0 || in.id == 0 {
         discard;
     } else {
         return in.id;

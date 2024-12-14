@@ -1,40 +1,31 @@
-use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2};
+use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2, Vector4};
 
 pub type SpriteId = u32;
 
-/// The five spritesheets we can draw sprites from, and their intended uses
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Layer {
-    /// The `Sprite` sheet is for general objects in the world; if you only have one sheet use this one
-    Sprite,
-    
-    /// The `Terrain` sheet is for terrain tiles
-    Terrain,
-
-    /// `Mob`s often have more animation frames, so we reserve an entire sheet for them
-    Mob,
-
-    /// The `Background` sheet is for larger images to be used as backgrounds, skyboxes, etc.
-    Background,
-
-    /// To display text, it's convenient to have one sheet set aside for a bitmap `Font`
-    Font,
-}
-
+/// A `Sprite` is the basic unit of drawing to the screen. We create a list of sprites and pass them
+/// to a `GpuWrapper` to render.
+/// 
+/// Each sprite has a rectangular region of the source texture (see `Layer`) and a transformation
+/// matrix that places it somewhere on the screen.
+/// ```
+/// # use spritebatch::sprite::{ Sprite, Layer };
+/// # use cgmath::Deg;
+/// let s = Sprite::new(Layer::Sprite, (100, 100), (16, 16)).translate((0.5, 0.5)).rotate(Deg(45));
+/// ```
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Sprite {
-    pub transform: Matrix3<f32>,
-    pub z: f32,
+    transform: Matrix3<f32>,
+    pub(crate) z: f32,
     size: Vector2<u32>,
     origin: Point2<u32>,
-    layer: Layer,
-    override_alpha: Option<f32>,
+    pub(crate) layer: u32,
+    tint: Vector4<f32>,
     id: SpriteId
 }
 
 #[derive(Copy, Clone, PartialEq, Debug, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
-pub struct RawSprite {
+pub(crate) struct RawSprite {
     transform_i: [f32; 3],
     transform_j: [f32; 3],
     transform_k: [f32; 3],
@@ -42,24 +33,25 @@ pub struct RawSprite {
     size: [f32; 2],
     z: f32,
     id: u32,
-    override_alpha: f32,
-    is_override_alpha: u32
+    tint: [f32; 4]
 }
 
 impl Sprite {
-    pub fn new(layer: Layer, origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>) -> Self {
+    /// Create a Sprite drawn from the given spritesheet, with a given origin and size in that spritesheet
+    pub fn new(origin: impl Into<Point2<u32>>, size: impl Into<Vector2<u32>>) -> Self {
         Self {
             z: 0.0,
-            layer,
+            layer: 0,
             transform: Matrix3::identity(),
             origin: origin.into(),
             size: size.into(),
-            override_alpha: None,
+            tint: (1.0, 1.0, 1.0, 1.0).into(),
             id: 0
         }
     }
 
-    pub fn into_raw(self, texture_size: impl Into<Vector2<u32>>) -> RawSprite {
+    /// Convert a sprite into a `RawSprite` which can be loaded into an instance buffer and sent to the GPU
+    pub(crate) fn into_raw(self, texture_size: impl Into<Vector2<u32>>) -> RawSprite {
         let [transform_i, transform_j, transform_k] = self.transform.into();
         let fsize = Point2::new(self.size.x as f32, self.size.y as f32);
         let forigin = Point2::new(self.origin.x as f32, self.origin.y as f32);
@@ -77,8 +69,7 @@ impl Sprite {
             size,
             z: self.z,
             id: self.id,
-            override_alpha: self.override_alpha.unwrap_or(0.0),
-            is_override_alpha: self.override_alpha.map_or(0, |_| 1)
+            tint: self.tint.into(),
         }
     }
 
@@ -131,6 +122,7 @@ impl Sprite {
         }
     }
 
+    /// Return a sprite with the given transform matrix (to set the matrix manually)
     pub fn with_transform(self, transform: impl Into<Matrix3<f32>>) -> Self {
         Self {
             transform: transform.into(),
@@ -138,27 +130,52 @@ impl Sprite {
         }
     }
 
+    /// Return a sprite with the given Z index (between 0.0 and 1.0 inclusive, with
+    /// 0.0 being closest to the top and 1.0 being closest to the bottom)
     pub fn with_z(self, z: f32) -> Self {
         Self { z, ..self }
     }
-    
-    pub fn with_override_alpha(self, override_alpha: Option<f32>) -> Self {
+
+    /// Change the tint of the sprite, which is an RGBA vec4 that each pixel is multiplied
+    /// by on display. This is useful for fading, coloring, whatever, on a sprite without
+    /// changing the spritesheet
+    pub fn with_tint(self, tint: impl Into<Vector4<f32>>) -> Self {
         Self {
-            override_alpha,
+            tint: tint.into(),
             ..self
         }
     }
 
+    /// Sprites can be given ids for hit detection, see `GpuWrapper::get_sprite_ids`
     pub fn with_id(self, id: SpriteId) -> Self {
         Self {
             id,
             ..self
         }
     }
+    
+    /// Returns a sprite with the given layer
+    pub fn with_layer(self, layer: u32) -> Self {
+        Self {
+            layer,
+            ..self
+        }
+    }
+
+    /// Returns a sprite that's been positioned at the given coordinates, in a "screen" space that's
+    /// the given dimensions. This is the normal way to draw a sprite to the window; if you give every
+    /// sprite the same screen size then you can just treat the positions as pixel coordinates in that screen.
+    pub fn with_position(self, pos: impl Into<Vector2<f32>>, screen: impl Into<Vector2<f32>>) -> Self {
+        let pos = pos.into();
+        let screen = screen.into();
+        self
+            .scale((self.size.x as f32 / screen.x, self.size.y as f32 / screen.y))
+            .translate((pos.x / screen.x, pos.y / screen.y))
+    }
 }
 
 impl RawSprite {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: size_of::<Self>() as wgpu::BufferAddress,
             // We need to switch from using a step mode of Vertex to Instance
@@ -204,13 +221,8 @@ impl RawSprite {
                 wgpu::VertexAttribute {
                     offset: 60,
                     shader_location: 8,
-                    format: wgpu::VertexFormat::Float32,
+                    format: wgpu::VertexFormat::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: 64,
-                    shader_location: 9,
-                    format: wgpu::VertexFormat::Uint32,
-                }
         ]
         }
     }

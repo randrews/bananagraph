@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use cgmath::{Deg, EuclideanSpace};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendState, Buffer, BufferUsages, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
+use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
@@ -14,10 +14,10 @@ pub struct GpuWrapper<'a> {
     // The handles to the actual GPU hardware
     adapter: wgpu::Adapter,
     device: Device,
-    
+
     // A queue to set up commands for a redraw
     queue: wgpu::Queue,
-    
+
     // Two render pipelines: one for the pixel data and one for
     // sprite IDs for hit detection
     render_pipeline: wgpu::RenderPipeline,
@@ -41,10 +41,10 @@ pub struct GpuWrapper<'a> {
     depth_texture: crate::texture::Texture,
 
     // The textures we'll draw sprites from
-    spritesheet: crate::texture::Texture,
+    spritesheets: Vec<crate::texture::Texture>,
 
     // The texture the id pipeline outputs to, and the buffer
-    // we read them from 
+    // we read them from
     id_texture: crate::texture::Texture,
     id_buffer: Arc<Buffer>,
 }
@@ -57,8 +57,6 @@ impl<'a> GpuWrapper<'a> {
         let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
         surface.configure(&device, &config);
 
-        let spritesheet = crate::texture::Texture::from_bytes(&device, &queue, include_bytes!("cardsLarge_tilemap_packed.png"), Some("spritesheet")).unwrap();
-        
         let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
 
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
@@ -84,7 +82,7 @@ impl<'a> GpuWrapper<'a> {
             depth_texture,
             id_texture,
             id_buffer,
-            spritesheet,
+            spritesheets: vec![],
         }
     }
 
@@ -123,7 +121,7 @@ impl<'a> GpuWrapper<'a> {
 
         (surface, adapter, device, queue)
     }
-    
+
     fn create_buffer(device: &Device, label: &str, size: wgpu::BufferAddress, usage: BufferUsages) -> Buffer {
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(label),
@@ -376,29 +374,32 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// The bind group for the render pass
-    fn render_bind_group(&self) -> wgpu::BindGroup {
+    fn render_bind_groups(&self) -> Vec<wgpu::BindGroup> {
         let bind_group_layout = self.render_pipeline.get_bind_group_layout(0);
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                // The sampler
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-                // The texture for the spritesheet
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&self.spritesheet.view),
-                },
-                // The uniform buffer, which contains the overall transform matrix
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: self.render_uniform_buffer.as_entire_binding(),
-                },
-            ],
-        })
+
+        self.spritesheets.iter().map(|sp|
+            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    // The sampler
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                    // The texture for the spritesheet
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&sp.view),
+                    },
+                    // The uniform buffer, which contains the overall transform matrix
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.render_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            })
+        ).collect()
     }
 
     /// Writes the scaling transform matrix to the uniform buffer, so the render pass can pick it up
@@ -409,7 +410,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over
     fn create_instance_buffer(&self, sprites: Vec<Sprite>) -> Buffer {
-        let raw_sprites = sprites.into_iter().map(|s| s.into_raw(self.spritesheet.size)).collect::<Vec<RawSprite>>();
+        let raw_sprites = sprites.into_iter().map(|s| s.into_raw(self.spritesheets[s.layer as usize].size)).collect::<Vec<RawSprite>>();
         self.device.create_buffer_init(
             &BufferInitDescriptor {
                 label: Some("Instance Buffer"),
@@ -421,14 +422,14 @@ impl<'a> GpuWrapper<'a> {
 
     /// Queues a call to an arbitrary shader pipeline, targeting an arbitrary texture view. It will
     /// iterate over the given instances for the unit-square-vertex-buffer.
-    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
+    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -447,23 +448,37 @@ impl<'a> GpuWrapper<'a> {
         rpass.set_vertex_buffer(1, instances.slice(..));
 
         rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        rpass.set_bind_group(0, &self.render_bind_group(), &[]);
-        rpass.draw_indexed(0..6, 0, 0..num_instances);
+
+        let bind_groups = self.render_bind_groups();
+
+        // Go through the runs of same-layer sprites and dispatch draw calls
+        let mut start = 0;
+        let mut end = 0;
+        while start < layers.len() {
+            // after this, end is the first one of the new group, start is the first of this group
+            while end < layers.len() && layers[start] == layers[end] { end += 1 }
+
+            // Bind the texture for this group
+            rpass.set_bind_group(0, &bind_groups[layers[start] as usize], &[]);
+            // Draw this run!
+            rpass.draw_indexed(0..6, 0, start as u32..end as u32);
+            start = end; // Jump to the next group
+        }
     }
 
     /// Queues a call to the render shader, which outputs color data to the surface
-    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32, surface: &wgpu::SurfaceTexture) {
-        self.call_shader(encoder, instances, num_instances, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
+    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>, surface: &wgpu::SurfaceTexture) {
+        self.call_shader(encoder, instances, layers, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
     }
 
     /// Queues a call to the id shader, which outputs sprite ids to id_texture
-    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, num_instances: u32) {
+    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>) {
         let target = self.id_texture.texture.create_view(&wgpu::TextureViewDescriptor {
             format: Some(TextureFormat::R32Uint),
             ..Default::default()
         });
 
-        self.call_shader(encoder, instances, num_instances, &self.id_pipeline, &target);
+        self.call_shader(encoder, instances, layers, &self.id_pipeline, &target);
     }
 
     /// We can only copy textures to buffers that are multiples of `COPY_BYTES_PER_ROW_ALIGNMENT`
@@ -490,7 +505,7 @@ impl<'a> GpuWrapper<'a> {
     /// Queues reading the id texture (target of the id shader) into the id buffer.
     fn read_id_texture(&self, encoder: &mut wgpu::CommandEncoder) {
         let size = self.id_texture.size;
-        
+
         let src = ImageCopyTexture {
             texture: &self.id_texture.texture,
             mip_level: 0,
@@ -512,25 +527,46 @@ impl<'a> GpuWrapper<'a> {
         });
     }
 
+    pub fn add_texture(&mut self, bytes: &[u8], label: Option<&str>) -> u32 {
+        let spritesheet = crate::texture::Texture::from_bytes(&self.device, &self.queue, bytes, label).unwrap();
+        self.spritesheets.push(spritesheet);
+        self.spritesheets.len() as u32 - 1
+    }
+
     /// Redraws the display and populates the id buffer, returning how long it took to do that.
-    pub fn redraw(&self, sprites: Vec<Sprite>) -> Duration {
+    pub fn redraw(&self, mut sprites: Vec<Sprite>) -> Duration {
         let start = std::time::Instant::now();
         let tex = self.surface.get_current_texture().unwrap();
-
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.bind_for_render();
-        let num_sprites = sprites.len() as u32;
-        let instance_buffer = self.create_instance_buffer(sprites);
-        self.call_render_shader(&mut encoder, &instance_buffer, num_sprites, &tex);
-        self.call_id_shader(&mut encoder, &instance_buffer, num_sprites);
-        self.read_id_texture(&mut encoder);
+
+        if !sprites.is_empty() {
+            // Prep sprites by sorting them
+            sprites.sort_by(|a, b| {
+                if a.z == b.z {
+                    b.layer.cmp(&a.layer)
+                } else {
+                    b.z.total_cmp(&a.z)
+                }
+            });
+
+            let layers: Vec<u32> = sprites.iter().map(|s| s.layer).collect();
+
+
+            self.bind_for_render();
+            let instance_buffer = self.create_instance_buffer(sprites);
+
+            self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
+            self.call_id_shader(&mut encoder, &instance_buffer, &layers);
+            self.read_id_texture(&mut encoder);
+        }
+
         self.queue.submit(Some(encoder.finish()));
         tex.present();
 
         let end = std::time::Instant::now();
         end - start
     }
-    
+
     /// Returns the buffer of which sprite id is topmost for a given pixel, and the width of
     /// that buffer.
     /// In order to easily do hit detection, alongside drawing the sprites, we run the "id shader"
@@ -543,7 +579,7 @@ impl<'a> GpuWrapper<'a> {
         let result: Option<Result<Vec<u32>, wgpu::BufferAsyncError>> = None;
         let m = Arc::new(std::sync::Mutex::new(result));
         let m2 = m.clone();
-        
+
         self.id_buffer.slice(..).map_async(wgpu::MapMode::Read, move|result| {
             if result.is_ok() {
                 let ids: Vec<u32> = bytemuck::cast_slice(&capturable.slice(..).get_mapped_range()).to_vec();
@@ -560,7 +596,7 @@ impl<'a> GpuWrapper<'a> {
             }
             self.device.poll(wgpu::Maintain::wait()).panic_on_timeout()
         };
-        
+
         let screen_width = self.id_texture.size.x;
         result.map(|data| IdBuffer::new(data, Self::id_buffer_width(screen_width), screen_width))
     }
