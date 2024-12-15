@@ -43,7 +43,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
             }
 
             // Redraw if it's redrawing time
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => { wrapper.redraw(board_sprites()); },
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => { wrapper.redraw(&board_sprites()); },
 
             // Resize if it's resizing time
             Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
@@ -55,8 +55,9 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
             // When the timer fires, redraw thw window and restart the timer (update will go here)
             Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                let time = wrapper.redraw(board_sprites());
-                if time.as_millis() >= 500 { println!("Slow frame: {} ms", time.as_millis()) };
+                wrapper.redraw_with_ids(board_sprites());
+                // println!("{}", time.as_micros());
+                // if time.as_millis() >= 500 { println!("Slow frame: {} ms", time.as_millis()) };
                 target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
             }
 

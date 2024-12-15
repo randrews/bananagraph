@@ -174,6 +174,12 @@ impl Sprite {
     }
 }
 
+impl AsRef<Sprite> for Sprite {
+    fn as_ref(&self) -> &Sprite {
+        &self
+    }
+}
+
 impl RawSprite {
     pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {

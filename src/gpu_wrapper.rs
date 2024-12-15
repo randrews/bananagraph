@@ -409,8 +409,8 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over
-    fn create_instance_buffer(&self, sprites: Vec<Sprite>) -> Buffer {
-        let raw_sprites = sprites.into_iter().map(|s| s.into_raw(self.spritesheets[s.layer as usize].size)).collect::<Vec<RawSprite>>();
+    fn create_instance_buffer<S: AsRef<Sprite>>(&self, sprites: Vec<S>) -> Buffer {
+        let raw_sprites = sprites.into_iter().map(|s| s.as_ref().into_raw(self.spritesheets[s.as_ref().layer as usize].size)).collect::<Vec<RawSprite>>();
         self.device.create_buffer_init(
             &BufferInitDescriptor {
                 label: Some("Instance Buffer"),
@@ -533,15 +533,16 @@ impl<'a> GpuWrapper<'a> {
         self.spritesheets.len() as u32 - 1
     }
 
-    /// Redraws the display and populates the id buffer, returning how long it took to do that.
-    pub fn redraw(&self, mut sprites: Vec<Sprite>) -> Duration {
-        let start = std::time::Instant::now();
-        let tex = self.surface.get_current_texture().unwrap();
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    /// Sort the given sprite iterator by z and put it into an instance buffer, returning
+    /// the buffer and vec of layers (so we know how many / which draw calls to make).
+    /// If the iterator contains no sprites, return None
+    fn set_sprites<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Option<(Buffer, Vec<u32>)> {
+        let mut sprites: Vec<_> = sprites.into_iter().collect();
 
         if !sprites.is_empty() {
             // Prep sprites by sorting them
             sprites.sort_by(|a, b| {
+                let (a, b) = (a.as_ref(), b.as_ref());
                 if a.z == b.z {
                     b.layer.cmp(&a.layer)
                 } else {
@@ -549,11 +550,45 @@ impl<'a> GpuWrapper<'a> {
                 }
             });
 
-            let layers: Vec<u32> = sprites.iter().map(|s| s.layer).collect();
+            let layers: Vec<u32> = sprites.iter().map(|s| s.as_ref().layer).collect();
 
 
             self.bind_for_render();
             let instance_buffer = self.create_instance_buffer(sprites);
+            Some((instance_buffer, layers))
+        } else {
+            None
+        }
+    }
+
+    /// Redraws the display, but does not populate the id buffer, returning how long it took to do that.
+    pub fn redraw<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Duration {
+        let start = std::time::Instant::now();
+        let tex = self.surface.get_current_texture().unwrap();
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
+            self.bind_for_render();
+
+            self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
+        }
+
+        self.queue.submit(Some(encoder.finish()));
+        tex.present();
+
+        let end = std::time::Instant::now();
+        end - start
+    }
+
+    /// Redraws the display and populates the id buffer, returning the buffer. This is marginally faster than
+    /// calling both `redraw` and `redraw_ids` individually since it only encodes the sprites once, but, it
+    /// only encodes the sprites once, so the same sprites will be used for both pipelines.
+    pub fn redraw_with_ids<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Result<IdBuffer, wgpu::BufferAsyncError> {
+        let tex = self.surface.get_current_texture().unwrap();
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
+            self.bind_for_render();
 
             self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
             self.call_id_shader(&mut encoder, &instance_buffer, &layers);
@@ -562,9 +597,23 @@ impl<'a> GpuWrapper<'a> {
 
         self.queue.submit(Some(encoder.finish()));
         tex.present();
+        self.get_sprite_ids()
+    }
 
-        let end = std::time::Instant::now();
-        end - start
+    /// Populates the id buffer; does not redraw the display or run the render shader. Returns the id buffer
+    /// (exactly as get_sprite_ids would)
+    pub fn redraw_ids<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Result<IdBuffer, wgpu::BufferAsyncError> {
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
+            self.bind_for_render();
+
+            self.call_id_shader(&mut encoder, &instance_buffer, &layers);
+            self.read_id_texture(&mut encoder);
+        }
+
+        self.queue.submit(Some(encoder.finish()));
+        self.get_sprite_ids()
     }
 
     /// Returns the buffer of which sprite id is topmost for a given pixel, and the width of
