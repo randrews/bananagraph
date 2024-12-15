@@ -244,6 +244,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bananagraph"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "cgmath",
+ "image",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1185,6 +1196,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "map_editor"
+version = "0.1.0"
+dependencies = [
+ "bananagraph",
+ "cgmath",
+ "env_logger",
+ "pollster",
+ "rand 0.9.0-beta.1",
+ "winit",
+]
+
+[[package]]
 name = "maybe-rayon"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2009,20 +2032,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
 dependencies = [
  "bitflags 2.6.0",
-]
-
-[[package]]
-name = "spritebatch"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "cgmath",
- "env_logger",
- "image",
- "pollster",
- "rand 0.9.0-beta.1",
- "wgpu",
- "winit",
 ]
 
 [[package]]
