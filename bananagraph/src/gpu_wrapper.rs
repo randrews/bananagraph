@@ -2,7 +2,6 @@ use crate::scale_transform;
 use std::default::Default;
 use std::sync::Arc;
 use std::time::Duration;
-use cgmath::{Deg, EuclideanSpace};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
 use winit::dpi::PhysicalSize;

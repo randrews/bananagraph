@@ -1,11 +1,10 @@
 use cgmath::Vector2;
-use wgpu::{AddressMode, Device, Extent3d, FilterMode, ImageCopyTexture, ImageDataLayout, Queue, Sampler, SamplerDescriptor, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
+use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
 use image::{DynamicImage, GenericImageView, ImageError};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: TextureView,
-    pub sampler: Sampler,
     pub size: Vector2<u32>
 }
 
@@ -38,16 +37,6 @@ impl Texture {
 
         let view = texture.create_view(&Default::default());
 
-        let sampler = device.create_sampler(&SamplerDescriptor {
-            address_mode_u: AddressMode::ClampToEdge,
-            address_mode_v: AddressMode::ClampToEdge,
-            address_mode_w: AddressMode::ClampToEdge,
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Nearest,
-            mipmap_filter: FilterMode::Nearest,
-            ..Default::default()
-        });
-
         queue.write_texture(
             ImageCopyTexture {
                 texture: &texture,
@@ -58,13 +47,13 @@ impl Texture {
             &diffuse_rgba,
             ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some((4 * dimensions.0)),
+                bytes_per_row: Some(4 * dimensions.0),
                 rows_per_image: Some(dimensions.1),
             },
             size,
         );
 
-        Self { texture, view, sampler, size: Vector2::new(dimensions.0, dimensions.1) }
+        Self { texture, view, size: Vector2::new(dimensions.0, dimensions.1) }
     }
 
     /// Create a texture the size of the surface, with a given format and label
@@ -88,22 +77,8 @@ impl Texture {
         let texture = device.create_texture(&desc);
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = device.create_sampler(
-            &SamplerDescriptor {
-                address_mode_u: AddressMode::ClampToEdge,
-                address_mode_v: AddressMode::ClampToEdge,
-                address_mode_w: AddressMode::ClampToEdge,
-                mag_filter: FilterMode::Linear,
-                min_filter: FilterMode::Linear,
-                mipmap_filter: FilterMode::Nearest,
-                compare: Some(wgpu::CompareFunction::LessEqual),
-                lod_min_clamp: 0.0,
-                lod_max_clamp: 100.0,
-                ..Default::default()
-            }
-        );
 
-        Self { texture, view, sampler, size: (size.width, size.height).into() }
+        Self { texture, view, size: (size.width, size.height).into() }
     }
 
     /// Create a texture suitable for use as a depth texture

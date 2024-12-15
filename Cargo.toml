@@ -1,5 +1,6 @@
 [workspace]
 members = [
-    "bananagraph",
+    "bananagraph", "grid",
     "map_editor"
 ]
+resolver = "2"

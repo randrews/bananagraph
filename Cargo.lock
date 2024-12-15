@@ -889,6 +889,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "grid"
+version = "0.1.0"
+dependencies = [
+ "line_drawing",
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "half"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1147,6 +1155,15 @@ dependencies = [
  "bitflags 2.6.0",
  "libc",
  "redox_syscall 0.4.1",
+]
+
+[[package]]
+name = "line_drawing"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d1478a313008a3e6c8149995e90a99ee9094034b5c5c3da1eeb81183cb61d1d"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

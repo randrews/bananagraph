@@ -1,4 +1,4 @@
-use cgmath::{Deg, ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2, Vector4};
+use cgmath::{ElementWise, Matrix3, Point2, Rad, SquareMatrix, Vector2, Vector4};
 
 pub type SpriteId = u32;
 
@@ -8,9 +8,9 @@ pub type SpriteId = u32;
 /// Each sprite has a rectangular region of the source texture (see `Layer`) and a transformation
 /// matrix that places it somewhere on the screen.
 /// ```
-/// # use spritebatch::sprite::{ Sprite, Layer };
+/// # use bananagraph::{ Sprite };
 /// # use cgmath::Deg;
-/// let s = Sprite::new(Layer::Sprite, (100, 100), (16, 16)).translate((0.5, 0.5)).rotate(Deg(45));
+/// let s = Sprite::new((100, 100), (16, 16)).translate((0.5, 0.5)).rotate(Deg(45.0));
 /// ```
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Sprite {

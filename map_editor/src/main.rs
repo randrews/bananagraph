@@ -1,10 +1,11 @@
 use bananagraph::{ GpuWrapper, Sprite };
 use std::time::{Duration, Instant};
-use rand::RngCore;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
+
+mod board;
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
@@ -45,9 +46,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
             // When the timer fires, redraw thw window and restart the timer (update will go here)
             Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                wrapper.redraw_with_ids(board_sprites());
-                // println!("{}", time.as_micros());
-                // if time.as_millis() >= 500 { println!("Slow frame: {} ms", time.as_millis()) };
+                wrapper.redraw_with_ids(board_sprites()).expect("Drawing error");
                 target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
             }
 
