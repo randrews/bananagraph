@@ -62,7 +62,7 @@ impl Coord {
         dx.abs() + dy.abs()
     }
 
-    pub fn adjacent(&self, other: Coord) -> bool {
+    pub fn orthogonal(&self, other: Coord) -> bool {
         other == self.north() || other == self.south() ||
             other == self.east() || other == self.west()
     }
@@ -70,6 +70,10 @@ impl Coord {
     pub fn diagonal(&self, other: Coord) -> bool {
         other == self.northeast() || other == self.northwest() ||
             other == self.southeast() || other == self.southwest()
+    }
+
+    pub fn adjacent(&self, other: Coord) -> bool {
+        self.orthogonal(other) || self.diagonal(other)
     }
 }
 

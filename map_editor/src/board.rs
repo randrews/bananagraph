@@ -37,7 +37,7 @@ impl Board {
             *cell = if x == 0 || y == 0 {
                 Cell::TallWall
             } else if x == (width - 1) as usize || y == (height - 1) as usize {
-                Cell::ShortWall
+                Cell::TallWall
             } else {
                 Board::square_color((x as i32, y as i32))
             }

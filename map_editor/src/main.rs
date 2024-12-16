@@ -4,7 +4,7 @@ use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
-use grid::{xy, Grid, GridMut};
+use grid::{Coord, Grid, GridMut};
 use crate::board::{Board, Cell};
 
 mod board;
@@ -82,15 +82,11 @@ fn toggle_wall(id: u32, board: &mut Board) {
     if id >= 100000 {
         let coord = sprite_id_to_coord(id, board.size().0);
         let cell = board.get(coord.into()).unwrap();
-        let (x, y) = coord;
+        //let (x, y) = coord;
 
         *board.get_mut(coord.into()).unwrap() = match cell {
             Cell::Black | Cell::White => {
-                if x == 0 || y == 0 {
-                    Cell::TallWall
-                } else {
-                    Cell::ShortWall
-                }
+                Cell::TallWall
             },
             Cell::ShortWall | Cell::TallWall => {
                 Board::square_color(coord)
@@ -102,7 +98,16 @@ fn toggle_wall(id: u32, board: &mut Board) {
 
 fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     let mut sprites = board_sprites(board);
-    let buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
+    let mut buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
+
+    if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
+        let id = buffer[mouse_pos.into()];
+        if id >= 100000 {
+            let board_coord = sprite_id_to_coord(id, board.size().0);
+            sprites = shorten_walls(&board, board_coord, sprites);
+            buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
+        }
+    }
 
     if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
         let id = buffer[mouse_pos.into()];
@@ -120,6 +125,32 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     }
 
     wrapper.redraw(&sprites);
+}
+
+fn shorten_walls(board: &Board, mouse_coord: (i32, i32), sprites: Vec<Sprite>) -> Vec<Sprite> {
+    let width = board.size().0;
+    sprites.iter().map(|sprite| {
+        if sprite.id >= 100000 {
+            let coord: Coord = sprite_id_to_coord(sprite.id, width).into();
+            if matches!(board.get(coord), Some(Cell::TallWall)) &&
+                (coord == mouse_coord.into() || coord.adjacent(mouse_coord.into())) &&
+                coord.0 > 0 &&
+                coord.1 > 0 {
+                return build_sprite(Cell::ShortWall, coord.into(), width)
+            }
+        }
+        *sprite
+    }).collect()
+    // let ids: Set<_> = board
+    //     .adjacent_coords(mouse_coord.into())
+    //     .filter_map(|neighbor| if matches!(board.get(*neighbor), Some(Cell::TallWall)) {
+    //         Some(neighbor.0 + width * neighbor.1 + 100000)
+    //     } else {
+    //         None
+    //     })
+    //     .collect();
+    //
+    // sprites.iter().filter
 }
 
 fn sprite_id_to_coord(id: u32, width: i32) -> (i32, i32) {
@@ -153,27 +184,31 @@ fn coord_to_z(coord: (i32, i32)) -> f32 {
     0.99 / ((x + y + 1) as f32)
 }
 
+fn build_sprite(cell: Cell, coord: (i32, i32), width: i32) -> Sprite {
+    let (x, y) = coord;
+    let tile: Sprite = cell.into();
+    let screen_pos = coord_to_iso(coord);
+    tile.with_id((x + y * width + 100000) as u32)
+        .with_z(coord_to_z((x, y)))
+        .with_position(screen_pos, (320.0, 240.0))
+}
+
 fn board_sprites(board: &Board) -> Vec<Sprite> {
     let mut sprites = Vec::new();
 
     for (n, cell) in board.iter().enumerate() {
-        let (x, y) = board.coord(n).into();
-        let tile: Sprite = (*cell).into();
-        let screen_pos = coord_to_iso((x, y));
-        let tile = tile.with_id((x + y * board.size().0 + 100000) as u32)
-            .with_z(coord_to_z((x, y)))
-            .with_position(screen_pos, (320.0, 240.0));
+        let tile = build_sprite(*cell, board.coord(n).into(), board.size().0);
         sprites.push(tile);
     }
 
-    let crate_tile = Sprite::new((256, 288), (32, 48));
-    let (x, y) = (3, 4);
-    let screen_pos = coord_to_iso((x, y));
-    let z = coord_to_z((x, y)) - 0.0002; // Move it two epsilon toward the camera, so it's atop the tile itself as well as the (possible) back highlighting
+    // let crate_tile = Sprite::new((256, 288), (32, 48));
+    // let (x, y) = (3, 4);
+    // let screen_pos = coord_to_iso((x, y));
+    // let z = coord_to_z((x, y)) - 0.0002; // Move it two epsilon toward the camera, so it's atop the tile itself as well as the (possible) back highlighting
 
-    sprites.push(crate_tile
-        .with_z(z)
-        .with_position(screen_pos, (320.0, 240.0)));
+    // sprites.push(crate_tile
+    //     .with_z(z)
+    //     .with_position(screen_pos, (320.0, 240.0)));
 
     sprites
 }

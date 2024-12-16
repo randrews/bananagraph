@@ -20,7 +20,7 @@ pub struct Sprite {
     origin: Point2<u32>,
     pub(crate) layer: u32,
     tint: Vector4<f32>,
-    id: SpriteId
+    pub id: SpriteId
 }
 
 #[derive(Copy, Clone, PartialEq, Debug, bytemuck::Zeroable, bytemuck::Pod)]

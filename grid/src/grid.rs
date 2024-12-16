@@ -87,6 +87,27 @@ pub trait Grid {
         c.into_iter().filter(|pt| self.contains(*pt))
     }
 
+    /// The coordinates of our diagonal neighbors, but only the ones actually in the grid
+    fn diagonal_coords(&self, point: Coord) -> impl Iterator<Item=Coord> {
+        let c = vec![point.northeast(), point.southeast(), point.southwest(), point.northwest()];
+        c.into_iter().filter(|pt| self.contains(*pt))
+    }
+
+    /// The coordinates of our orthogonal and diagonal neighbors, but only the ones actually in the grid
+    fn adjacent_coords(&self, point: Coord) -> impl Iterator<Item=Coord> {
+        let c = vec![
+            point.north(),
+            point.northeast(),
+            point.east(),
+            point.southeast(),
+            point.south(),
+            point.southwest(),
+            point.west(),
+            point.northwest()
+        ];
+        c.into_iter().filter(|pt| self.contains(*pt))
+    }
+
     /// Convenience method for `for_neighbors` just comparing with ==
     fn neighbors_equal(&self, point: Coord, val: Self::CellType) -> (bool, bool, bool, bool)
         where Self::CellType: PartialEq {
