@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
-use winit::dpi::PhysicalSize;
+use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
@@ -25,6 +25,10 @@ pub struct GpuWrapper<'a> {
     // The window and surface of that window that we're rendering to
     window: &'a Window,
     surface: wgpu::Surface<'a>,
+
+    // The "logical" size of the window space, used for creating the
+    // scale transform
+    logical_size: (u32, u32),
 
     // Inputs to the render pipelines: a unit square, which we need
     // buffers to store on the GPU, and a uniform buffer with the
@@ -49,7 +53,7 @@ pub struct GpuWrapper<'a> {
 }
 
 impl<'a> GpuWrapper<'a> {
-    pub async fn new(window: &'a Window) -> Self {
+    pub async fn new(window: &'a Window, logical_size: (u32, u32)) -> Self {
         let (surface, adapter, device, queue) = Self::create_device(window).await;
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
@@ -74,6 +78,7 @@ impl<'a> GpuWrapper<'a> {
             id_pipeline,
             window,
             surface,
+            logical_size,
             vertex_buffer,
             index_buffer,
             render_uniform_buffer,
@@ -404,7 +409,7 @@ impl<'a> GpuWrapper<'a> {
     /// Writes the scaling transform matrix to the uniform buffer, so the render pass can pick it up
     fn bind_for_render(&self) {
         let PhysicalSize { width, height } = self.window.inner_size();
-        self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform((640, 480), (width, height))));
+        self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform(self.logical_size, (width, height))));
     }
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over

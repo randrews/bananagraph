@@ -18,7 +18,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
         .with_min_inner_size(LogicalSize { width: 640, height: 480 })
         .build(&event_loop)?;
 
-    let mut wrapper = GpuWrapper::new(&window).await;
+    let mut wrapper = GpuWrapper::new(&window, (640, 480)).await;
     wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
     let our_id = window.id();
 

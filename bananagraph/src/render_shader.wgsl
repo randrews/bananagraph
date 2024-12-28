@@ -50,9 +50,8 @@ const unit_to_world: mat3x3<f32> = mat3x3<f32>(
 
     var transform = mat3x3<f32>(sprite.transform_i, sprite.transform_j, sprite.transform_k);
 
-    var pt = transform * vec3f(position, 1.0);
-    pt = unit_to_world * pt;
-    var transformed = locals.transform * vec4f(pt, 1.0);
+    var pt = unit_to_world * transform * vec3f(position, 1.0);
+    var transformed =  locals.transform * vec4f(pt, 1.0);
     out.position = vec4f(transformed.x, transformed.y, sprite.z, 1.0);
 
     // Convert the world-coord-square into the rectangle of the actual sprite

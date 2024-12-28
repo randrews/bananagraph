@@ -3,6 +3,7 @@ mod id_buffer;
 mod scale_transform;
 mod sprite;
 mod texture;
+mod drawing_context;
 
 pub use gpu_wrapper::GpuWrapper;
 pub use sprite::Sprite;
