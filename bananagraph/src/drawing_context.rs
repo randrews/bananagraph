@@ -40,9 +40,12 @@ impl DrawingContext {
         let scale = Matrix3::from_nonuniform_scale(scale.x, scale.y);
         let rotation = Matrix3::from_angle_z(rotation);
 
+        let aspect_scale = Matrix3::from_nonuniform_scale(sprite.size.x as f32, sprite.size.y as f32);
+        let invert_aspect_scale = Matrix3::invert(&aspect_scale).unwrap();
+
         // Translate so the center is on the origin, rotate, scale, and translate back.
         t = Matrix3::from_translation((-0.5, -0.5).into()) * t;
-        t = rotation * t;
+        t = invert_aspect_scale * scale * rotation * aspect_scale * t;
         t = scale * t;
         t = Matrix3::from_translation((0.5, 0.5).into()) * t;
 
@@ -74,20 +77,16 @@ impl DrawingContext {
     }
 
     /// Return a drawing context with the transform matrix rotated by this angle
+    /// We have to temporarily scale it with the aspect ratio of the screen, or doing this
+    /// distorts the context
     pub fn rotate(self, theta: impl Into<Rad<f32>>) -> Self {
+        let rotation = Matrix3::from_angle_z(theta);
+        let scale = Matrix3::from_nonuniform_scale(self.screen.x, self.screen.y);
+        let invert_scale = Matrix3::invert(&scale).unwrap();
+
         Self {
-            transform: Matrix3::from_angle_z(theta) * self.transform,
+            transform: invert_scale * rotation * scale * self.transform,
             ..self
         }
     }
 }
-
-// For some reason cgmath doesn't have a helper for nonuniform scaling?
-// fn scaling_matrix(factor: impl Into<Vector2<f32>>) -> Matrix3<f32> {
-//     let factor = factor.into();
-//     Matrix3::new(
-//         factor.x, 0.0, 0.0,
-//         0.0, factor.y, 0.0,
-//         0.0, 0.0, 1.0
-//     )
-// }

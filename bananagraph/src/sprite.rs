@@ -89,12 +89,6 @@ impl Sprite {
         }
     }
 
-    /// Return a sprite with the transform matrix scaled by the reciprocal of these factors
-    pub fn inv_scale(self, reciprocal: impl Into<Vector2<f32>>) -> Self {
-        let reciprocal = reciprocal.into();
-        self.scale((1.0 / reciprocal.x, 1.0 / reciprocal.y))
-    }
-
     /// Return a sprite with the transform matrix translated by this vector
     pub fn translate(self, delta: impl Into<Vector2<f32>>) -> Self {
         Self {
@@ -103,21 +97,13 @@ impl Sprite {
         }
     }
 
-    /// Return a sprite with the transform matrix scaled by the size of the sprite (in pixels
-    /// from the texture)
-    pub fn size_scale(self) -> Self {
-        self.scale((self.size.x as f32, self.size.y as f32))
-    }
-
-    /// Return a sprite with the transform matrix scaled by the reciprocal of the size of the
-    /// sprite (in pixels from the texture)
-    pub fn inv_size_scale(self) -> Self {
-        self.inv_scale((self.size.x as f32, self.size.y as f32))
-    }
-
     pub fn rotate(self, theta: impl Into<Rad<f32>>) -> Self {
+        let rotation = Matrix3::from_angle_z(theta);
+        let scale = Matrix3::from_nonuniform_scale(self.size.x as f32, self.size.y as f32);
+        let invert_scale = Matrix3::invert(&scale).unwrap();
+
         Self {
-            transform: Matrix3::from_angle_z(theta) * self.transform,
+            transform: invert_scale * rotation * scale * self.transform,
             ..self
         }
     }
@@ -160,17 +146,6 @@ impl Sprite {
             layer,
             ..self
         }
-    }
-
-    /// Returns a sprite that's been positioned at the given coordinates, in a "screen" space that's
-    /// the given dimensions. This is the normal way to draw a sprite to the window; if you give every
-    /// sprite the same screen size then you can just treat the positions as pixel coordinates in that screen.
-    pub fn with_position(self, pos: impl Into<Vector2<f32>>, screen: impl Into<Vector2<f32>>) -> Self {
-        let pos = pos.into();
-        let screen = screen.into();
-        self
-            .scale((self.size.x as f32 / screen.x, self.size.y as f32 / screen.y))
-            .translate((pos.x / screen.x, pos.y / screen.y))
     }
 }
 
