@@ -16,7 +16,7 @@ pub type SpriteId = u32;
 pub struct Sprite {
     transform: Matrix3<f32>,
     pub(crate) z: f32,
-    size: Vector2<u32>,
+    pub size: Vector2<u32>,
     origin: Point2<u32>,
     pub(crate) layer: u32,
     tint: Vector4<f32>,

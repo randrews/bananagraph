@@ -1,4 +1,4 @@
-use bananagraph::{ GpuWrapper, Sprite };
+use bananagraph::{DrawingContext, GpuWrapper, Sprite};
 use std::time::{Duration, Instant};
 use cgmath::Deg;
 use winit::dpi::LogicalSize;
@@ -17,6 +17,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let mut wrapper = GpuWrapper::new(&window, (800, 450)).await;
     wrapper.add_texture(include_bytes!("cube.png"), None);
+    wrapper.add_texture(include_bytes!("background.png"), None);
     let our_id = window.id();
 
     let timer_length = Duration::from_millis(20);
@@ -70,18 +71,31 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
 fn redraw(wrapper: &GpuWrapper) {
     let (w, h) = (400.0, 225.0);
-    let sprite = Sprite::new((0, 0), (32, 32))
-        //.translate((-0.5, -0.5))
-        //.scale((32.0, 32.0))
-        //.inv_scale((800.0, 450.0))
-        .translate((-0.5, -0.5))
-        .rotate(Deg(45.0))
-        .translate((0.5, 0.5))
-        .scale((32.0 / w, 32.0 / h))
-        //.inv_scale((w, h))
-        .translate((1.0 / w * 32.0, 1.0 / h * 16.0))
+    // let sprite = Sprite::new((0, 0), (32, 32))
+    //     //.translate((-0.5, -0.5))
+    //     //.scale((32.0, 32.0))
+    //     //.inv_scale((800.0, 450.0))
+    //     .translate((-0.5, -0.5))
+    //     .rotate(Deg(90.0))
+    //     //.scale((2.0, 2.0))
+    //     .translate((0.5, 0.5))
+    //     .scale((32.0 / w, 32.0 / h))
+    //     //.inv_scale((w, h))
+    //     .translate((1.0 / w * 32.0, 1.0 / h * 16.0))
+    //     ;
+
+    let bg = Sprite::new((0, 0), (800, 450)).with_layer(1).with_z(0.2);
+    let sprite = Sprite::new((0, 0), (32, 32)).with_z(0.1);
+    let dc = DrawingContext::new((800.0, 450.0))
+        .rotate(Deg(-45.0))
+        .scale((0.5, 0.5))
+        .translate((0.25, 0.5))
         ;
-    wrapper.redraw([sprite]);
+
+    wrapper.redraw([
+        dc.place(bg, (0.0, 0.0), (1.0, 1.0), Deg(0.0)),
+        //dc.place(sprite, (0.0, 0.0), (1.0, 1.0), Deg(45.0))
+    ]);
 }
 
 pub fn main() {

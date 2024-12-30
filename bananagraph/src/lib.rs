@@ -7,3 +7,4 @@ mod drawing_context;
 
 pub use gpu_wrapper::GpuWrapper;
 pub use sprite::Sprite;
+pub use drawing_context::DrawingContext;
