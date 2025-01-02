@@ -1,4 +1,4 @@
-use cgmath::{Matrix3, Rad, SquareMatrix, Vector2};
+use cgmath::{Deg, Matrix3, Rad, SquareMatrix, Vector2};
 use crate::Sprite;
 
 #[derive(Copy, Clone, Debug)]
@@ -16,26 +16,24 @@ impl DrawingContext {
         }
     }
 
-    pub fn place(&self, sprite: Sprite, position: impl Into<Vector2<f32>>, scale: impl Into<Vector2<f32>>, rotation: impl Into<Rad<f32>>) -> Sprite {
+    pub fn place(&self, sprite: impl Into<Sprite>, position: impl Into<Vector2<f32>>) -> Sprite {
+        self.place_scaled_rotated(sprite, position, (1.0, 1.0), Deg(0.0))
+    }
+
+    pub fn place_rotated(&self, sprite: impl Into<Sprite>, position: impl Into<Vector2<f32>>, rotation: impl Into<Rad<f32>>) -> Sprite {
+        self.place_scaled_rotated(sprite, position, (1.0, 1.0), rotation)
+    }
+
+    pub fn place_scaled(&self, sprite: impl Into<Sprite>, position: impl Into<Vector2<f32>>, scale: impl Into<Vector2<f32>>) -> Sprite {
+        self.place_scaled_rotated(sprite, position, scale, Deg(0.0))
+    }
+
+    pub fn place_scaled_rotated(&self, sprite: impl Into<Sprite>, position: impl Into<Vector2<f32>>, scale: impl Into<Vector2<f32>>, rotation: impl Into<Rad<f32>>) -> Sprite {
+        let sprite = sprite.into();
         // This is the transform we will eventually apply to the sprite
         let mut t = Matrix3::identity(); //self.transform;
         let scale = scale.into();
         let rotation = rotation.into();
-
-        // If there's a rotation or a scale involved, then those are relative to the center of the sprite
-        // if rotation.is_some() || scale.is_some() {
-        //     // Grab the scale factor, which we'll turn into a transform matrix
-        //     let scale = scale.map_or(Matrix3::identity(), scaling_matrix);
-        //
-        //     // Grab the rotation angle or a default
-        //     let rotation = rotation.map_or(Matrix3::identity(), |angle| Matrix3::from_angle_z(angle));
-        //
-        //     // Translate so the center is on the origin, rotate, scale, and translate back.
-        //     t = Matrix3::from_translation((-0.5, -0.5).into()) * t;
-        //     t = rotation * t;
-        //     t = scale * t;
-        //     t = Matrix3::from_translation((0.5, 0.5).into()) * t;
-        // }
 
         let scale = Matrix3::from_nonuniform_scale(scale.x, scale.y);
         let rotation = Matrix3::from_angle_z(rotation);
@@ -51,7 +49,6 @@ impl DrawingContext {
 
         // We need to scale the sprite to the correct size:
         t = Matrix3::from_nonuniform_scale(sprite.size.x as f32 / self.screen.x, sprite.size.y as f32 / self.screen.y) * t;
-        // t = scaling_matrix((sprite.size.x as f32 / self.screen.x, sprite.size.y as f32 / self.screen.y)) * t;
 
         // Translate it to the coords in context space:
         let position = position.into();

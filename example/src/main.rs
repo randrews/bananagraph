@@ -94,8 +94,8 @@ fn redraw(wrapper: &GpuWrapper) {
         .translate((0.25, 0.5));
 
     wrapper.redraw([
-        dc.place(bg, (0.0, 0.0), (1.0, 1.0), Deg(0.0)), // Just draw the grayness straight
-        dc.place(sprite, (0.0, 0.0), (1.0, 1.0), Deg(45.0)), // Rotate the cube about its center
+        dc.place(bg, (0.0, 0.0)), // Just draw the grayness straight
+        dc.place_rotated(sprite, (0.0, 0.0), Deg(45.0)), // Rotate the cube about its center
         sprite
             .scale((32.0, 32.0)) // Scale to the sprite size in pixels. Sprite is now huge, and distorted!
             .translate((100.0, 100.0)) // Translate to pixel coords
