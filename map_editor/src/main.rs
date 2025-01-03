@@ -1,4 +1,4 @@
-use bananagraph::{ GpuWrapper, Sprite };
+use bananagraph::{DrawingContext, GpuWrapper, Sprite};
 use std::time::{Duration, Instant};
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
@@ -14,11 +14,11 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let window = winit::window::WindowBuilder::new()
         .with_title("The Thing")
-        .with_inner_size(LogicalSize { width: 640, height: 480 })
-        .with_min_inner_size(LogicalSize { width: 640, height: 480 })
+        .with_inner_size(LogicalSize { width: 1280, height: 720 })
+        .with_min_inner_size(LogicalSize { width: 1280, height: 720 })
         .build(&event_loop)?;
 
-    let mut wrapper = GpuWrapper::new(&window, (640, 480)).await;
+    let mut wrapper = GpuWrapper::new(&window, (1280, 720)).await;
     wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
     let our_id = window.id();
 
@@ -97,7 +97,7 @@ fn toggle_wall(id: u32, board: &mut Board) {
 }
 
 fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
-    let mut sprites = board_sprites(board);
+    let (mut sprites, drawing_context) = board_sprites(board);
     let mut buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
 
     if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
@@ -115,7 +115,7 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
             let board_coord = sprite_id_to_coord(id, board.size().0);
             match board.get(board_coord.into()) {
                 Some(Cell::White | Cell::Black) => {
-                    let highlight = highlight_sprites(board_coord);
+                    let highlight = highlight_sprites(board_coord, make_drawing_context());
                     sprites.push(highlight.0);
                     sprites.push(highlight.1);
                 },
@@ -136,21 +136,11 @@ fn shorten_walls(board: &Board, mouse_coord: (i32, i32), sprites: Vec<Sprite>) -
                 (coord == mouse_coord.into() || coord.adjacent(mouse_coord.into())) &&
                 coord.0 > 0 &&
                 coord.1 > 0 {
-                return build_sprite(Cell::ShortWall, coord.into(), width)
+                return build_sprite(Cell::ShortWall, coord.into(), width, make_drawing_context())
             }
         }
         *sprite
     }).collect()
-    // let ids: Set<_> = board
-    //     .adjacent_coords(mouse_coord.into())
-    //     .filter_map(|neighbor| if matches!(board.get(*neighbor), Some(Cell::TallWall)) {
-    //         Some(neighbor.0 + width * neighbor.1 + 100000)
-    //     } else {
-    //         None
-    //     })
-    //     .collect();
-    //
-    // sprites.iter().filter
 }
 
 fn sprite_id_to_coord(id: u32, width: i32) -> (i32, i32) {
@@ -184,43 +174,40 @@ fn coord_to_z(coord: (i32, i32)) -> f32 {
     0.99 / ((x + y + 1) as f32)
 }
 
-fn build_sprite(cell: Cell, coord: (i32, i32), width: i32) -> Sprite {
-    let (x, y) = coord;
+fn build_sprite(cell: Cell, coord: Coord, width: i32, dc: DrawingContext) -> Sprite {
+    let (x, y) = coord.into();
     let tile: Sprite = cell.into();
-    let screen_pos = coord_to_iso(coord);
-    tile.with_id((x + y * width + 100000) as u32)
-        .with_z(coord_to_z((x, y)))
-        .with_position(screen_pos, (320.0, 240.0))
+    let screen_pos = coord_to_iso(coord.into());
+    dc.place(
+        tile.with_id((x + y * width + 100000) as u32)
+            .with_z(coord_to_z((x, y))),
+        screen_pos)
 }
 
-fn board_sprites(board: &Board) -> Vec<Sprite> {
+fn make_drawing_context() -> DrawingContext {
+    DrawingContext::new((1280.0, 720.0))
+}
+
+fn board_sprites(board: &Board) -> (Vec<Sprite>, DrawingContext) {
     let mut sprites = Vec::new();
+    let drawing_context = make_drawing_context();
 
     for (n, cell) in board.iter().enumerate() {
-        let tile = build_sprite(*cell, board.coord(n).into(), board.size().0);
+        let tile = build_sprite(*cell, board.coord(n), board.size().0, drawing_context);
         sprites.push(tile);
     }
 
-    // let crate_tile = Sprite::new((256, 288), (32, 48));
-    // let (x, y) = (3, 4);
-    // let screen_pos = coord_to_iso((x, y));
-    // let z = coord_to_z((x, y)) - 0.0002; // Move it two epsilon toward the camera, so it's atop the tile itself as well as the (possible) back highlighting
-
-    // sprites.push(crate_tile
-    //     .with_z(z)
-    //     .with_position(screen_pos, (320.0, 240.0)));
-
-    sprites
+    (sprites, drawing_context)
 }
 
-fn highlight_sprites(coord: (i32, i32)) -> (Sprite, Sprite) {
+fn highlight_sprites(coord: (i32, i32), dc: DrawingContext) -> (Sprite, Sprite) {
     let toph = Sprite::new((416, 0), (32, 48));
     let btmh = Sprite::new((384, 0), (32, 48));
-    let screen_pos = coord_to_iso(coord);
+    let screen_pos = coord_to_iso(coord.into());
     let z = coord_to_z(coord);
     (
-        toph.with_position(screen_pos, (320.0, 240.0)).with_z(z - 0.0001),
-        btmh.with_position(screen_pos, (320.0, 240.0)).with_z(z - 0.0003)
+        dc.place(toph, screen_pos).with_z(z - 0.0001),
+        dc.place(btmh, screen_pos).with_z(z - 0.0003)
     )
 }
 
