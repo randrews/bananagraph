@@ -1,13 +1,16 @@
 use bananagraph::{DrawingContext, GpuWrapper, Sprite};
 use std::time::{Duration, Instant};
+use cgmath::Vector2;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
 use grid::{Coord, Grid, GridMut};
 use crate::board::{Board, Cell};
+use crate::iso_map::{AsSprite, IsoMap};
 
 mod board;
+mod iso_map;
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
@@ -29,7 +32,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
     let mut mouse_pos: (f64, f64) = (-1f64, -1f64);
 
     // Make a 10x10 board:
-    let mut board = Board::new(10, 10);
+    let mut board = Board::new(10, 7);
 
     event_loop.run(move |event, target| {
         match event {
@@ -82,7 +85,6 @@ fn toggle_wall(id: u32, board: &mut Board) {
     if id >= 100000 {
         let coord = sprite_id_to_coord(id, board.size().0);
         let cell = board.get(coord.into()).unwrap();
-        //let (x, y) = coord;
 
         *board.get_mut(coord.into()).unwrap() = match cell {
             Cell::Black | Cell::White => {
@@ -97,7 +99,13 @@ fn toggle_wall(id: u32, board: &mut Board) {
 }
 
 fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
-    let (mut sprites, drawing_context) = board_sprites(board);
+    let iso_map = IsoMap::new(board, (32, 48), (32, 16));
+    let base_dc = DrawingContext::new((wrapper.logical_size.0 as f32, wrapper.logical_size.1 as f32));
+
+    let dims = iso_map.dimensions();
+    let (dc) = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
+
+    let mut sprites = iso_map.sprites(dc);
     let mut buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
 
     if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
@@ -115,9 +123,10 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
             let board_coord = sprite_id_to_coord(id, board.size().0);
             match board.get(board_coord.into()) {
                 Some(Cell::White | Cell::Black) => {
-                    let highlight = highlight_sprites(board_coord, make_drawing_context());
-                    sprites.push(highlight.0);
-                    sprites.push(highlight.1);
+                    let highlight = highlight_sprites(board_coord);
+                    let z = iso_map.z_coord(board_coord.into());
+                    sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord.into(), &dc));
+                    sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord.into(), &dc));
                 },
                 _ => {}
             }
@@ -125,6 +134,35 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     }
 
     wrapper.redraw(&sprites);
+}
+
+/// This handles creating the drawing context to display the map, which implies creating a lot of the
+/// screen layout of the game. The screen width is divided up like this:
+/// |MM|----AA----|MM|-------------BB-------------|MM|
+/// MMs are 5% margin columns; AA is a toolbar / status bar, BB is the map.
+/// We want to devote most of the width to the map, so, let's say 0.65 map and 0.2 sidebar.
+/// We would like to scale the map so it fits in that rectangle:
+fn create_drawing_contexts(dims: Vector2<f32>, base_dc: DrawingContext) -> (DrawingContext) {
+    let screen_proportion = 0.65; // The fraction of the screen width we devote to the map
+    // We want to scale by the same factor, width and height, so whichever of those will fill the screen
+    // with the lowest factor, that's what we use for both.
+    let factor = (base_dc.screen.x / dims.x * screen_proportion).min(base_dc.screen.y / dims.y);
+    let dc = base_dc.scale((factor, factor));
+
+    // Shift us over by 0.3x of the screen width
+    let dc = dc.translate((0.3, 0.0));
+
+    // We're smaller in one dimension or the other, probably, so, center
+    // us in that axis:
+    if dims.x * factor < base_dc.screen.x * screen_proportion {
+        let margin = base_dc.screen.x - dims.x;
+        dc.translate(((margin / 2.0) / dc.screen.x / factor, 0.0))
+    } else if dims.y * factor < base_dc.screen.y {
+        let margin = base_dc.screen.y - dims.y;
+        dc.translate((0.0, (margin / 2.0) / dc.screen.y / factor))
+    } else {
+        dc
+    }
 }
 
 fn shorten_walls(board: &Board, mouse_coord: (i32, i32), sprites: Vec<Sprite>) -> Vec<Sprite> {
@@ -136,7 +174,9 @@ fn shorten_walls(board: &Board, mouse_coord: (i32, i32), sprites: Vec<Sprite>) -
                 (coord == mouse_coord.into() || coord.adjacent(mouse_coord.into())) &&
                 coord.0 > 0 &&
                 coord.1 > 0 {
-                return build_sprite(Cell::ShortWall, coord.into(), width, make_drawing_context())
+                // The trick here is that the transform is the same. So we just make a new sprite
+                // with the same transform, id, and z:
+                return Cell::ShortWall.as_sprite().with_transform(sprite.transform).with_id(sprite.id).with_z(sprite.z)
             }
         }
         *sprite
@@ -147,67 +187,12 @@ fn sprite_id_to_coord(id: u32, width: i32) -> (i32, i32) {
     ((id - 100000) as i32 % width, (id - 100000) as i32 / width)
 }
 
-fn coord_to_iso(coord: (i32, i32)) -> (f32, f32) {
-    let (x, y) = coord;
-    let width = 320; // (logical) screen width
-    let (dw, dh) = (16, 8); // how much to shift for one increment of "down" vs "lateral". Depends on the exact tile art
-    let (basex, basey) = ((width / 2 - dw), 0); // Coord of (0, 0) tile at top center
-
-    // for each x, we go right dw and down dh
-    // for each y, we go _left_ dw and down dh
-    ((basex + (x - y) * dw) as f32, (basey + (x + y) * dh) as f32)
-}
-
-/// Return a z coordinate between 0.0 and 1.0 that will stack these tiles prettily.
-/// These will, on a 10x10 grid, range from 0.052 to 0.99, meaning if you add or subtract a
-/// ten-thousandth from them then you'll still be in the same "rank" but tweaking the z-order
-/// within a given cell.
-/// Because this isa ll orthographic projection, we don't really give a damn what the z coordinate
-/// _is,_ as long as they sort correctly; we're only using it for occultation, not perspective.
-fn coord_to_z(coord: (i32, i32)) -> f32 {
-    let (x, y) = coord;
-
-    // The rank of something is its x + y, because isometric view; the lower right of the board
-    // is closest to the "camera". Higher z means it's farther away, so we can just divide something
-    // by x + y. But! We can't have x + y == 0 obviously, so tweak it a bit, and we also can't have
-    // a z of 1.0, because the 0.0..1.0 range is exclusive. So make it a little bit less, 0.99:
-    0.99 / ((x + y + 1) as f32)
-}
-
-fn build_sprite(cell: Cell, coord: Coord, width: i32, dc: DrawingContext) -> Sprite {
-    let (x, y) = coord.into();
-    let tile: Sprite = cell.into();
-    let screen_pos = coord_to_iso(coord.into());
-    dc.place(
-        tile.with_id((x + y * width + 100000) as u32)
-            .with_z(coord_to_z((x, y))),
-        screen_pos)
-}
-
-fn make_drawing_context() -> DrawingContext {
-    DrawingContext::new((1280.0, 720.0))
-}
-
-fn board_sprites(board: &Board) -> (Vec<Sprite>, DrawingContext) {
-    let mut sprites = Vec::new();
-    let drawing_context = make_drawing_context();
-
-    for (n, cell) in board.iter().enumerate() {
-        let tile = build_sprite(*cell, board.coord(n), board.size().0, drawing_context);
-        sprites.push(tile);
-    }
-
-    (sprites, drawing_context)
-}
-
-fn highlight_sprites(coord: (i32, i32), dc: DrawingContext) -> (Sprite, Sprite) {
+fn highlight_sprites(coord: (i32, i32)) -> (Sprite, Sprite) {
     let toph = Sprite::new((416, 0), (32, 48));
     let btmh = Sprite::new((384, 0), (32, 48));
-    let screen_pos = coord_to_iso(coord.into());
-    let z = coord_to_z(coord);
     (
-        dc.place(toph, screen_pos).with_z(z - 0.0001),
-        dc.place(btmh, screen_pos).with_z(z - 0.0003)
+        toph,
+        btmh
     )
 }
 

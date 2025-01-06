@@ -28,7 +28,7 @@ pub struct GpuWrapper<'a> {
 
     // The "logical" size of the window space, used for creating the
     // scale transform
-    logical_size: (u32, u32),
+    pub logical_size: (u32, u32),
 
     // Inputs to the render pipelines: a unit square, which we need
     // buffers to store on the GPU, and a uniform buffer with the

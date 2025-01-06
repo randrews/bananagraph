@@ -1,5 +1,6 @@
 use bananagraph::Sprite;
 use grid::{xy, Coord, Grid, GridMut};
+use crate::iso_map::AsSprite;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Cell {
@@ -10,8 +11,8 @@ pub enum Cell {
     Blank
 }
 
-impl Into<Sprite> for Cell {
-    fn into(self) -> Sprite {
+impl AsSprite for Cell {
+    fn as_sprite(&self) -> Sprite {
         match self {
             Cell::White => Sprite::new((320, 0), (32, 48)),
             Cell::Black => Sprite::new((352, 0), (32, 48)),

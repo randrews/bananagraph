@@ -3,7 +3,7 @@ use crate::Sprite;
 
 #[derive(Copy, Clone, Debug)]
 pub struct DrawingContext {
-    screen: Vector2<f32>,
+    pub screen: Vector2<f32>,
     transform: Matrix3<f32>
 }
 
