@@ -110,6 +110,7 @@ fn redraw(wrapper: &GpuWrapper) {
             .translate((26.0, 26.0)) // translate back, and then some, in pixel coords
             .scale((1.0 / 400.0, 1.0 / 225.0)) // Scale everything back down by the size of the world, also removes distortion
             .with_z(0.008),
+        bg.with_z(0.9999)
     ]);
 }
 

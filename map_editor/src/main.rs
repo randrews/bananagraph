@@ -23,6 +23,7 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let mut wrapper = GpuWrapper::new(&window, (1280, 720)).await;
     wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
+    wrapper.add_texture(include_bytes!("background.png"), Some("background"));
     let our_id = window.id();
 
     let timer_length = Duration::from_millis(20);
@@ -132,6 +133,9 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
             }
         }
     }
+
+    // Push the background:
+    sprites.push(Sprite::new((0, 0), (360, 360)).with_layer(1).with_z(0.99999).with_tint((0.7, 0.8, 1.0, 1.0)));
 
     wrapper.redraw(&sprites);
 }
