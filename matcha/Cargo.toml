@@ -1,10 +1,12 @@
 [package]
-name = "example"
+name = "matcha"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 bananagraph = { path = "../bananagraph" }
+grid = { path = "../grid" }
 winit = { version = "0.29", features = ["rwh_05"] }
 pollster = "0.3.0"
 cgmath = "0.18.0"
+rand = "0.9.0-beta.1"

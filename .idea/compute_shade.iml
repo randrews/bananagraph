@@ -7,6 +7,7 @@
       <sourceFolder url="file://$MODULE_DIR$/map_editor/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/example/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/matcha/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/bananagraph/target" />
       <excludeFolder url="file://$MODULE_DIR$/map_editor/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />

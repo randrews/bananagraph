@@ -693,7 +693,6 @@ version = "0.1.0"
 dependencies = [
  "bananagraph",
  "cgmath",
- "grid",
  "pollster",
  "winit",
 ]
@@ -1230,6 +1229,18 @@ dependencies = [
  "bananagraph",
  "cgmath",
  "env_logger",
+ "grid",
+ "pollster",
+ "rand 0.9.0-beta.1",
+ "winit",
+]
+
+[[package]]
+name = "matcha"
+version = "0.1.0"
+dependencies = [
+ "bananagraph",
+ "cgmath",
  "grid",
  "pollster",
  "rand 0.9.0-beta.1",

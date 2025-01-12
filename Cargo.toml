@@ -2,5 +2,5 @@
 members = [
     "bananagraph", "example", "grid",
     "map_editor"
-]
+, "matcha"]
 resolver = "2"
