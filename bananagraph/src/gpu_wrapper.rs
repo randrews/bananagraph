@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
-use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
@@ -546,7 +546,7 @@ impl<'a> GpuWrapper<'a> {
     /// Sort the given sprite iterator by z and put it into an instance buffer, returning
     /// the buffer and vec of layers (so we know how many / which draw calls to make).
     /// If the iterator contains no sprites, return None
-    fn set_sprites<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Option<(Buffer, Vec<u32>)> {
+    fn set_sprites<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> (Buffer, Vec<u32>) {
         let mut sprites: Vec<_> = sprites.into_iter().collect();
 
         if !sprites.is_empty() {
@@ -565,9 +565,10 @@ impl<'a> GpuWrapper<'a> {
 
             self.bind_for_render();
             let instance_buffer = self.create_instance_buffer(sprites);
-            Some((instance_buffer, layers))
+            (instance_buffer, layers)
         } else {
-            None
+            let instance_buffer = self.create_instance_buffer(sprites);
+            (instance_buffer, vec![])
         }
     }
 
@@ -577,11 +578,9 @@ impl<'a> GpuWrapper<'a> {
         let tex = self.surface.get_current_texture().unwrap();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
-            self.bind_for_render();
-
-            self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
-        }
+        let (instance_buffer, layers) = self.set_sprites(sprites);
+        self.bind_for_render();
+        self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
 
         self.queue.submit(Some(encoder.finish()));
         tex.present();
@@ -597,13 +596,12 @@ impl<'a> GpuWrapper<'a> {
         let tex = self.surface.get_current_texture().unwrap();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
-            self.bind_for_render();
+        let (instance_buffer, layers) = self.set_sprites(sprites);
+        self.bind_for_render();
 
-            self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
-            self.call_id_shader(&mut encoder, &instance_buffer, &layers);
-            self.read_id_texture(&mut encoder);
-        }
+        self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
+        self.call_id_shader(&mut encoder, &instance_buffer, &layers);
+        self.read_id_texture(&mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
         tex.present();
@@ -615,12 +613,11 @@ impl<'a> GpuWrapper<'a> {
     pub fn redraw_ids<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Result<IdBuffer, wgpu::BufferAsyncError> {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        if let Some((instance_buffer, layers)) = self.set_sprites(sprites) {
-            self.bind_for_render();
+        let (instance_buffer, layers) = self.set_sprites(sprites);
+        self.bind_for_render();
 
-            self.call_id_shader(&mut encoder, &instance_buffer, &layers);
-            self.read_id_texture(&mut encoder);
-        }
+        self.call_id_shader(&mut encoder, &instance_buffer, &layers);
+        self.read_id_texture(&mut encoder);
 
         self.queue.submit(Some(encoder.finish()));
         self.get_sprite_ids()
