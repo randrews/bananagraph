@@ -3,85 +3,14 @@ use cgmath::{Deg, Point2};
 use hecs::{Entity, World};
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
-use grid::{Coord, Grid, VecGrid};
+use grid::{Grid, VecGrid};
+use crate::animation::Animation;
+use crate::piece::Piece;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum ClickTarget {
     SPRITE { id: SpriteId },
     LOCATION { location: Point2<f64> }
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum PieceColor {
-    RED,
-    YELLOW,
-    GREEN,
-    BLUE,
-    PINK,
-    PURPLE
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Animation {
-    SPIN { angle: Deg<f32> }
-}
-
-impl Animation {
-    pub fn tick(&mut self, dt: Duration) {
-        match self {
-            Animation::SPIN { angle} => {
-                let mut new_angle = *angle + Deg(360.0 * dt.as_millis() as f32 / 1000.0);
-                if new_angle >= Deg(360.0) {
-                    new_angle = Deg(360.0)
-                }
-                *angle = new_angle;
-            }
-        }
-    }
-
-    pub fn finished(&self) -> bool {
-        match self {
-            Animation::SPIN { angle, .. } => *angle == Deg(360.0)
-        }
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Piece {
-    color: PieceColor,
-    pub(crate) angle: Deg<f32>
-}
-
-impl Piece {
-    pub fn new(color: PieceColor) -> Self {
-        Self {
-            color,
-            angle: Deg(0.0)
-        }
-    }
-
-    pub fn new_from_rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        match rng.next_u32() % 6 {
-            0 => Self::new(PieceColor::RED),
-            1 => Self::new(PieceColor::YELLOW),
-            2 => Self::new(PieceColor::GREEN),
-            3 => Self::new(PieceColor::BLUE),
-            4 => Self::new(PieceColor::PINK),
-            5 => Self::new(PieceColor::PURPLE),
-            _ => unreachable!()
-        }
-    }
-
-    pub fn as_sprite(&self) -> Sprite {
-        match self.color {
-            PieceColor::RED => Sprite::new((240, 240), (80, 80)),
-            PieceColor::YELLOW => Sprite::new((0, 80), (80, 80)),
-            PieceColor::GREEN => Sprite::new((80, 160), (80, 80)),
-            PieceColor::BLUE => Sprite::new((160, 80), (80, 80)),
-            PieceColor::PINK => Sprite::new((320, 160), (80, 80)),
-            PieceColor::PURPLE => Sprite::new((400, 240), (80, 80)),
-        }
-    }
 }
 
 pub struct GameState<'a, R: Rng> {
@@ -172,14 +101,6 @@ impl<'a, R: Rng> GameState<'a, R> {
 
             // There's no current animation so tack one on:
             self.world.insert_one(ent, Animation::SPIN { angle: Deg(0.0) }).unwrap();
-
-            // println!("{} - {:?} - {:?}", id, piece.color, anim);
-
-            //let coord = self.board.coord(id as usize);
-            //self.world.
-            // if self.animations.iter().find(|a| a.applies_to(coord)).is_none() {
-            //     self.animations.push(Animation::SPIN { coord, angle: Deg(0.0)})
-            // }
         }
     }
 }
