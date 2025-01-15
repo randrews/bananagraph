@@ -537,6 +537,12 @@ impl<'a> GpuWrapper<'a> {
         self.spritesheets.len() as u32 - 1
     }
 
+    pub fn add_texture_from_array(&mut self, bytes: Vec<u8>, width: u32, label: Option<&str>) -> u32 {
+        let spritesheet = crate::texture::Texture::from_array(&self.device, &self.queue, bytes, width, label).unwrap();
+        self.spritesheets.push(spritesheet);
+        self.spritesheets.len() as u32 - 1
+    }
+
     /// Sort the given sprite iterator by z and put it into an instance buffer, returning
     /// the buffer and vec of layers (so we know how many / which draw calls to make).
     /// If the iterator contains no sprites, return None

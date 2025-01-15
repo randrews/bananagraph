@@ -1,6 +1,8 @@
 use bananagraph::{DrawingContext, GpuWrapper, Sprite};
 use std::time::{Duration, Instant};
+use cgmath::num_traits::Pow;
 use cgmath::Vector2;
+use rand::{Rng, RngCore};
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
@@ -23,7 +25,8 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let mut wrapper = GpuWrapper::new(&window, (1280, 720)).await;
     wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
-    wrapper.add_texture(include_bytes!("background.png"), Some("background"));
+    // wrapper.add_texture(include_bytes!("background.png"), Some("background"));
+    wrapper.add_texture_from_array(create_background(720), 720, Some("background"));
     let our_id = window.id();
 
     let timer_length = Duration::from_millis(20);
@@ -135,9 +138,26 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     }
 
     // Push the background:
-    sprites.push(Sprite::new((0, 0), (360, 360)).with_layer(1).with_z(0.99999).with_tint((0.7, 0.8, 1.0, 1.0)));
+    sprites.push(Sprite::new((0, 0), (720, 720)).with_layer(1).with_z(0.99999).with_tint((0.2, 0.3, 0.4, 1.0)));
 
     wrapper.redraw(&sprites);
+}
+
+fn create_background(size: usize) -> Vec<u8> {
+    let mut texture = vec![0u8; size * size * 4];
+    let center = size as f32 / 2.0;
+    let max_distance = (center * center * 2.0).sqrt();
+    let mut rng = rand::rng();
+
+    for y in 0..size {
+        for x in 0..size {
+            let distance: f32 = ((x as f32 - center).pow(2.0) + (y as f32 - center).pow(2.0)).sqrt() / max_distance;
+            let distance = distance + (rng.gen::<f32>() - 0.5) / 10.0;
+            let val = (distance * 255.0) as u8;
+            texture[(x + size * y) * 4 .. (x + size * y) * 4 + 4].copy_from_slice(&[val, val, val, 0xff])
+        }
+    }
+    texture
 }
 
 /// This handles creating the drawing context to display the map, which implies creating a lot of the

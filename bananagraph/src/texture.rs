@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
-use image::{DynamicImage, GenericImageView, ImageError};
+use image::{DynamicImage, GenericImageView, ImageError, RgbaImage};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -11,11 +11,16 @@ pub struct Texture {
 impl Texture {
     pub fn from_bytes(device: &Device, queue: &Queue, bytes: &[u8], label: Option<&str>) -> Result<Self, ImageError> {
         let img = image::load_from_memory(bytes)?;
+        Ok(Self::from_image(device, queue, &img.to_rgba8(), label))
+    }
+
+    pub fn from_array(device: &Device, queue: &Queue, bytes: Vec<u8>, width: u32, label: Option<&str>) -> Result<Self, ImageError> {
+        let img: RgbaImage = RgbaImage::from_raw(width, bytes.len() as u32 / 4 / width, bytes).unwrap();
         Ok(Self::from_image(device, queue, &img, label))
     }
 
-    pub fn from_image(device: &Device, queue: &Queue, img: &DynamicImage, label: Option<&str>) -> Self {
-        let diffuse_rgba = img.to_rgba8();
+    pub fn from_image(device: &Device, queue: &Queue, img: &RgbaImage, label: Option<&str>) -> Self {
+        let diffuse_rgba = img;
         let dimensions = img.dimensions();
 
         let size = Extent3d {
