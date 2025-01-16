@@ -3,7 +3,7 @@ use cgmath::{Deg, Point2};
 use hecs::{Entity, World};
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
-use grid::{Coord, Grid, VecGrid};
+use grid::{xy, Coord, Grid, VecGrid};
 use crate::animation::Animation;
 use crate::piece::{Piece, PieceColor};
 
@@ -25,17 +25,21 @@ impl<'a, R: Rng> GameState<'a, R> {
         let mut world = World::new();
         let mut board = VecGrid::new((8, 8).into(), Entity::DANGLING);
 
-        for coord in Grid::size(&board) {
-            board[coord] = world.spawn((Piece::new_from_rand(rng),));
-        }
-
-        // Clear out all the matches:
         loop {
-            if let Some(coords) = board.find_match(&world) {
-                board.scramble_match(&mut world, coords, rng);
-            } else {
-                break
+            for coord in Grid::size(&board) {
+                board[coord] = world.spawn((Piece::new_from_rand(rng),));
             }
+
+            // Clear out all the matches:
+            loop {
+                if let Some(coords) = board.find_match(&world) {
+                    board.scramble_match(&mut world, coords, rng);
+                } else {
+                    break
+                }
+            }
+
+            if board.has_move(&world) { break }
         }
 
         Self {
@@ -163,6 +167,64 @@ trait MatchaBoard {
         } else {
             None
         }
+    }
+
+    /// Return whether the given coord is in a legal move: could another cell be moved to match with
+    /// this one
+    fn is_move(&self, world: &World, coord: Coord) -> bool {
+        // There are only a few patterns we care about:
+        //
+        // _ _ X   X X _   X _ _   _ X X
+        // X X _   _ _ X   _ X X   X _ _
+        //
+        // _ X   X _   X _   _ X
+        // X _   _ X   X _   _ X
+        // X _   _ X   _ X   X _
+        //
+        // _ X _   X _ X   X _   _ X
+        // X _ X   _ X _   _ X   X _
+        //                 X _   _ X
+        //
+        // We'll represent these as sets of deltas off the out-of-place piece,
+        // and then just check each piece to see if it can be the out-of-place
+        // piece for a given delta set
+
+        let deltas = vec![
+            ((-1, 1), (-2, 1)),
+            ((-1, -1), (-2, -1)),
+            ((1, 1), (2, 1)),
+            ((1, -1), (2, -1)),
+
+            ((-1, 1), (-1, 2)),
+            ((1, 1), (1, 2)),
+            ((-1, -1), (-1, -2)),
+            ((1, -1), (1, -2)),
+
+            ((1, 1), (-1, 1)),
+            ((1, -1), (-1, -1)),
+            ((-1, -1), (-1, 1)),
+            ((1, -1), (1, 1)),
+        ];
+
+        if let Some(color) = self.get(world, coord) {
+            for (a, b) in deltas {
+                let a_cell = self.get(world, coord + xy(a.0, a.1));
+                let b_cell = self.get(world, coord + xy(b.0, b.1));
+                if let (Some(a_col), Some(b_col)) = (a_cell, b_cell) {
+                    if color == a_col && color == b_col {
+                        return true
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn has_move(&self, world: &World) -> bool {
+        for coord in self.size().into_iter() {
+            if self.is_move(world, coord) { return true }
+        }
+        false
     }
 
     /// Return the list of cells that are in an arbitrary match in the board
