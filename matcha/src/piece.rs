@@ -12,9 +12,23 @@ pub enum PieceColor {
     PURPLE
 }
 
+impl PieceColor {
+    pub fn from_rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
+        match rng.next_u32() % 6 {
+            0 => PieceColor::RED,
+            1 => PieceColor::YELLOW,
+            2 => PieceColor::GREEN,
+            3 => PieceColor::BLUE,
+            4 => PieceColor::PINK,
+            5 => PieceColor::PURPLE,
+            _ => unreachable!()
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Piece {
-    color: PieceColor,
+    pub(crate) color: PieceColor,
     pub(crate) angle: Deg<f32>
 }
 
@@ -27,15 +41,7 @@ impl Piece {
     }
 
     pub fn new_from_rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        match rng.next_u32() % 6 {
-            0 => Self::new(PieceColor::RED),
-            1 => Self::new(PieceColor::YELLOW),
-            2 => Self::new(PieceColor::GREEN),
-            3 => Self::new(PieceColor::BLUE),
-            4 => Self::new(PieceColor::PINK),
-            5 => Self::new(PieceColor::PURPLE),
-            _ => unreachable!()
-        }
+        Self::new(PieceColor::from_rand(rng))
     }
 
     pub fn as_sprite(&self) -> Sprite {
