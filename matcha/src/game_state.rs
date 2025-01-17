@@ -1,6 +1,7 @@
 use std::time::Duration;
 use cgmath::{Deg, Point2};
 use hecs::{Entity, World};
+use lazy_static::lazy_static;
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
 use grid::{xy, Coord, Grid, VecGrid};
@@ -17,7 +18,12 @@ pub struct GameState<'a, R: Rng> {
     world: World,
     board: VecGrid<Entity>,
     rng: &'a mut R,
-    screen: (u32, u32)
+    screen: (u32, u32),
+    selected: Option<Entity>
+}
+
+lazy_static! {
+    static ref VALID_MOVES: Vec<(Coord, Coord, Coord)> = all_valid_moves();
 }
 
 impl<'a, R: Rng> GameState<'a, R> {
@@ -46,7 +52,8 @@ impl<'a, R: Rng> GameState<'a, R> {
             world,
             board,
             rng,
-            screen
+            screen,
+            selected: None
         }
     }
 
@@ -85,6 +92,13 @@ impl<'a, R: Rng> GameState<'a, R> {
                         coord.1 as f32 * 85.0 + margin.1
                     ), *angle)
                 }
+
+                Some(Animation::PULSE { scale, .. }) => {
+                    dc.place_scaled(sprite, (
+                        coord.0 as f32 * 85.0 + margin.0,
+                        coord.1 as f32 * 85.0 + margin.1
+                    ), (*scale, 2.0 - *scale))
+                }
                 _ => {
                     dc.place(sprite, (
                         coord.0 as f32 * 85.0 + margin.0,
@@ -105,15 +119,28 @@ impl<'a, R: Rng> GameState<'a, R> {
                 self.world.find_entity_from_id(id - 1000)
             };
 
-            let has_anim = {
-                let mut query = self.world.query_one::<(Option<&Animation>,)>(ent).unwrap();
-                matches!(query.get(), Some((Some(_),)))
-            };
-
-            // There's no current animation so tack one on:
-            if !has_anim && self.board.is_match(&self.world, self.board.find(|e| *e == ent).unwrap()).is_some() {
-                self.world.insert_one(ent, Animation::SPIN { angle: Deg(0.0) }).unwrap();
+            if let Some(selected) = self.selected {
+                let selected_coord = self.board.find(|e| *e == selected).unwrap();
+                let new_coord = self.board.find(|e| *e == ent).unwrap();
+                println!("Swapping {}, {}", selected_coord, new_coord);
+                if self.board.valid_move(&self.world, selected_coord, new_coord) || self.board.valid_move(&self.world, new_coord, selected_coord) {
+                    println!("This would match!");
+                }
+                self.selected = None;
+                self.world.remove_one::<Animation>(selected).unwrap();
+            } else {
+                self.selected = Some(ent);
+                self.world.insert_one(ent, Animation::PULSE { scale: 1.0, delta: 1.0, run: true }).unwrap()
             }
+            // let has_anim = {
+            //     let mut query = self.world.query_one::<(Option<&Animation>,)>(ent).unwrap();
+            //     matches!(query.get(), Some((Some(_),)))
+            // };
+            //
+            // // There's no current animation so tack one on:
+            // if !has_anim && self.board.is_match(&self.world, self.board.find(|e| *e == ent).unwrap()).is_some() {
+            //     self.world.insert_one(ent, Animation::SPIN { angle: Deg(0.0) }).unwrap();
+            // }
         }
     }
 }
@@ -172,45 +199,9 @@ trait MatchaBoard {
     /// Return whether the given coord is in a legal move: could another cell be moved to match with
     /// this one
     fn is_move(&self, world: &World, coord: Coord) -> bool {
-        // There are only a few patterns we care about:
-        //
-        // _ _ X   X X _   X _ _   _ X X
-        // X X _   _ _ X   _ X X   X _ _
-        //
-        // _ X   X _   X _   _ X
-        // X _   _ X   X _   _ X
-        // X _   _ X   _ X   X _
-        //
-        // _ X _   X _ X   X _   _ X
-        // X _ X   _ X _   _ X   X _
-        //                 X _   _ X
-        //
-        // We'll represent these as sets of deltas off the out-of-place piece,
-        // and then just check each piece to see if it can be the out-of-place
-        // piece for a given delta set
-
-        let deltas = vec![
-            ((-1, 1), (-2, 1)),
-            ((-1, -1), (-2, -1)),
-            ((1, 1), (2, 1)),
-            ((1, -1), (2, -1)),
-
-            ((-1, 1), (-1, 2)),
-            ((1, 1), (1, 2)),
-            ((-1, -1), (-1, -2)),
-            ((1, -1), (1, -2)),
-
-            ((1, 1), (-1, 1)),
-            ((1, -1), (-1, -1)),
-            ((-1, -1), (-1, 1)),
-            ((1, -1), (1, 1)),
-        ];
-
         if let Some(color) = self.get(world, coord) {
-            for (a, b) in deltas {
-                let a_cell = self.get(world, coord + xy(a.0, a.1));
-                let b_cell = self.get(world, coord + xy(b.0, b.1));
-                if let (Some(a_col), Some(b_col)) = (a_cell, b_cell) {
+            for (a, b, _) in VALID_MOVES.iter() {
+                if let (Some(a_col), Some(b_col)) = (self.get(world, coord + *a), self.get(world, coord + *b)) {
                     if color == a_col && color == b_col {
                         return true
                     }
@@ -220,10 +211,27 @@ trait MatchaBoard {
         false
     }
 
+    /// Return whether there are any valid moves on the board
     fn has_move(&self, world: &World) -> bool {
         for coord in self.size().into_iter() {
             if self.is_move(world, coord) { return true }
         }
+        false
+    }
+
+    /// Whether the two pieces, if swapped, would cause the piece in coord1 to be a valid match.
+    /// To really ensure this is a valid move, call it twice with coord1 and coord2 swapped!
+    fn valid_move(&self, world: &World, coord1: Coord, coord2: Coord) -> bool {
+        if let Some(a_color) = self.get(world, coord1) {
+            for (x1, x2, b) in VALID_MOVES.iter() {
+                if let (Some(x1_color), Some(x2_color)) = (self.get(world, *x1 + coord1), self.get(world, *x2 + coord1)) {
+                    if a_color == x1_color && a_color == x2_color && *b + coord1 == coord2 {
+                        return true
+                    }
+                }
+            }
+        }
+
         false
     }
 
@@ -243,6 +251,46 @@ trait MatchaBoard {
             self.set(world, cell, PieceColor::from_rand(rng))
         }
     }
+}
+
+/// There are only a few patterns we care about:
+///
+/// ```text
+/// _ _ A
+/// X X B
+///
+/// _ A _
+/// X B X
+///
+/// A B X X
+/// ```
+///
+/// Also the mirror images of those in x and y as well as swapping x and y.
+/// We'll represent these as sets of deltas off the piece labeled 'A', and the spot
+/// labeled 'B' is where 'A' needs to move to create that match.
+fn all_valid_moves() -> Vec<(Coord, Coord, Coord)> {
+    // These are tuples of (X1, X2, B) offsets from 'A' above
+    let deltas = vec![
+        ((-1, 1), (-2, 1), (0, 1)),
+        ((-1, 1), (1, 1), (0, 1)),
+        ((2, 0), (3, 0), (1, 0)),
+    ];
+
+    let mut all_deltas = vec![];
+    for (x1, x2, b) in deltas {
+        all_deltas.push((x1, x2, b)); // push the primary version:
+        all_deltas.push(((-x1.0, x1.1), (-x2.0, x2.1), (-b.0, b.1))); // Reflect the x coords
+        all_deltas.push(((x1.0, -x1.1), (x2.0, -x2.1), (b.0, -b.1))); // Reflect the y coords
+        all_deltas.push(((-x1.0, -x1.1), (-x2.0, -x2.1), (-b.0, -b.1))); // Reflect both
+
+        // rotation versions:
+        all_deltas.push(((x1.1, x1.0), (x2.1, x2.0), (b.1, b.0))); // just rotate
+        all_deltas.push(((-x1.1, x1.0), (-x2.1, x2.0), (-b.1, b.0))); // Reflect the x coords
+        all_deltas.push(((x1.1, -x1.0), (x2.1, -x2.0), (b.1, -b.0))); // Reflect the y coords
+        all_deltas.push(((-x1.1, -x1.0), (-x2.1, -x2.0), (-b.1, -b.0))); // Reflect both
+    }
+
+    all_deltas.into_iter().map(|(x1, x2, b)| (xy(x1.0, x1.1), xy(x2.0, x2.1), xy(b.0, b.1))).collect()
 }
 
 impl MatchaBoard for VecGrid<Entity> {
