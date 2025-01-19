@@ -1,4 +1,3 @@
-use cgmath::Deg;
 use rand::{Rng, RngCore};
 use bananagraph::Sprite;
 
@@ -29,14 +28,12 @@ impl PieceColor {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Piece {
     pub(crate) color: PieceColor,
-    pub(crate) angle: Deg<f32>
 }
 
 impl Piece {
     pub fn new(color: PieceColor) -> Self {
         Self {
-            color,
-            angle: Deg(0.0)
+            color
         }
     }
 
@@ -44,7 +41,7 @@ impl Piece {
         Self::new(PieceColor::from_rand(rng))
     }
 
-    pub fn as_sprite(&self) -> Sprite {
+    pub fn base_sprite(&self) -> Sprite {
         match self.color {
             PieceColor::RED => Sprite::new((240, 240), (80, 80)),
             PieceColor::YELLOW => Sprite::new((0, 80), (80, 80)),

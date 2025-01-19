@@ -1,6 +1,7 @@
 mod game_state;
 mod piece;
 mod animation;
+mod drawable;
 
 use std::ops::Index;
 use bananagraph::{GpuWrapper, IdBuffer};

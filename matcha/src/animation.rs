@@ -40,3 +40,8 @@ impl Animation {
         }
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct Pulse {
+
+}

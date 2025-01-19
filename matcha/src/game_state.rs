@@ -29,11 +29,14 @@ lazy_static! {
 impl<'a, R: Rng> GameState<'a, R> {
     pub fn new(rng: &'a mut R, screen: (u32, u32)) -> Self {
         let mut world = World::new();
-        let mut board = VecGrid::new((8, 8).into(), Entity::DANGLING);
+        //let mut board = VecGrid::new((8, 8).into(), Entity::DANGLING);
 
+        let mut board = VecGrid::new((8, 8).into(), PieceColor::RED);
         loop {
+            // board is a temporary vecgrid of just piece colors, until we can create a valid
+            // field, then we'll reify it into entities
             for coord in Grid::size(&board) {
-                board[coord] = world.spawn((Piece::new_from_rand(rng),));
+                board[coord] = PieceColor::from_rand(rng)
             }
 
             // Clear out all the matches:
@@ -48,11 +51,16 @@ impl<'a, R: Rng> GameState<'a, R> {
             if board.has_move(&world) { break }
         }
 
+        let mut entity_board = VecGrid::new(Grid::size(&board), Entity::DANGLING);
+        for (n, color) in board.iter().enumerate() {
+            entity_board[board.coord(n)] = world.spawn((Piece::new(*color),))
+        }
+
         Self {
             world,
-            board,
             rng,
             screen,
+            board: entity_board,
             selected: None
         }
     }
@@ -80,7 +88,7 @@ impl<'a, R: Rng> GameState<'a, R> {
             let mut query = self.world.query_one::<(&Piece,Option<&Animation>)>(self.board[coord]).unwrap();
             let (piece,anim) = query.get().unwrap();
 
-            let sprite = piece.as_sprite().with_z(0.5);
+            let sprite = piece.base_sprite().with_z(0.5);
             // hecs will give us 0 as a sprite id, but bananagraph can't abide that, so, add something to it to
             // ensure we can hear clicks on the sprite
             let sprite = sprite.with_id(self.board[coord].id() + 1000);
@@ -309,6 +317,20 @@ impl MatchaBoard for VecGrid<Entity> {
             let mut piece = world.query_one_mut::<&mut Piece>(entity).unwrap();
              piece.color = color
         }
+    }
+
+    fn size(&self) -> Coord {
+        Grid::size(self)
+    }
+}
+
+impl MatchaBoard for VecGrid<PieceColor> {
+    fn get(&self, world: &World, coord: Coord) -> Option<PieceColor> {
+        Grid::get(self, coord).map(|p| *p)
+    }
+
+    fn set(&mut self, world: &mut World, coord: Coord, color: PieceColor) {
+        self[coord] = color
     }
 
     fn size(&self) -> Coord {
