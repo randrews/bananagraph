@@ -1,5 +1,7 @@
 use rand::{Rng, RngCore};
 use bananagraph::Sprite;
+use grid::Coord;
+use crate::drawable::Drawable;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PieceColor {
@@ -50,5 +52,19 @@ impl Piece {
             PieceColor::PINK => Sprite::new((320, 160), (80, 80)),
             PieceColor::PURPLE => Sprite::new((400, 240), (80, 80)),
         }
+    }
+
+    pub fn as_drawable(&self, id: u32, coord: Coord, screen_size: (u32, u32)) -> Drawable {
+        let sprite = self.base_sprite().with_z(0.5).with_id(id);
+
+        let margin = (
+            (screen_size.0 as f32 - 8.0 * 85.0) / 2.0,
+            (screen_size.1 as f32 - 8.0 * 85.0) / 2.0
+        );
+
+        Drawable::new(sprite, (
+            coord.0 as f32 * 85.0 + margin.0,
+            coord.1 as f32 * 85.0 + margin.1
+        ))
     }
 }

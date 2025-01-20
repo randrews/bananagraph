@@ -2,6 +2,7 @@ mod game_state;
 mod piece;
 mod animation;
 mod drawable;
+mod matcha_board;
 
 use std::ops::Index;
 use bananagraph::{GpuWrapper, IdBuffer};

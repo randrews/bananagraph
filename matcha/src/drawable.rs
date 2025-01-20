@@ -22,4 +22,25 @@ impl Drawable {
     pub fn as_sprite(&self, dc: DrawingContext) -> Sprite {
         dc.place_scaled_rotated(self.sprite, self.position, self.scale, self.angle)
     }
+
+    pub fn with_angle(self, angle: impl Into<Deg<f32>>) -> Self {
+        Self {
+            angle: angle.into(),
+            ..self
+        }
+    }
+
+    pub fn with_scale(self, scale: impl Into<Vector2<f32>>) -> Self {
+        Self {
+            scale: scale.into(),
+            ..self
+        }
+    }
+
+    pub fn with_position_delta(self, delta: impl Into<Vector2<f32>>) -> Self {
+        Self {
+            position: self.position + delta.into(),
+            ..self
+        }
+    }
 }
