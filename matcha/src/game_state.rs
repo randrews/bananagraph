@@ -4,7 +4,7 @@ use hecs::{Entity, World};
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
 use grid::{xy, Coord, Grid, VecGrid};
-use crate::animation::{Pulse};
+use crate::animation::{Animation, MoveAnimation, Pulse};
 use crate::drawable::Drawable;
 use crate::matcha_board::MatchaBoard;
 use crate::piece::{Piece, PieceColor};
@@ -70,25 +70,23 @@ impl<'a, R: Rng> GameState<'a, R> {
 
     pub fn tick(&mut self, dt: Duration) {
         // Go through all the animation types
-        for (ent, (anim,)) in self.world.query_mut::<(&mut Pulse,)>() {
-            anim.tick(dt);
-        }
+        Pulse::system(dt, &mut self.world);
+        MoveAnimation::system(dt, &mut self.world);
     }
 
     pub fn redraw(&self) -> Vec<Sprite> {
         let mut sprites = vec![];
         let dc = DrawingContext::new((self.screen.0 as f32, self.screen.1 as f32));
         for (n, coord) in Grid::size(&self.board).into_iter().enumerate() {
-            let mut query = self.world.query_one::<(&Piece,Option<&Pulse>)>(self.board[coord]).unwrap();
-            let (piece, pulse) = query.get().unwrap();
+            let mut query = self.world.query_one::<(&Piece,Option<&Pulse>,Option<&MoveAnimation>)>(self.board[coord]).unwrap();
+            let (piece, pulse, move_animation) = query.get().unwrap();
 
             // hecs will give us 0 as a sprite id, but bananagraph can't abide that, so, add something to it to
             // ensure we can hear clicks on the sprite
             let mut drawable = piece.as_drawable(self.board[coord].id() + 1000, coord, self.screen);
 
-            if let Some(pulse) = pulse {
-                drawable = pulse.apply_to(drawable)
-            }
+            pulse.map(|p| drawable = p.apply_to(drawable));
+            move_animation.map(|m| drawable = m.apply_to(drawable));
 
             sprites.push(drawable.as_sprite(dc))
         }
@@ -108,7 +106,9 @@ impl<'a, R: Rng> GameState<'a, R> {
                 let new_coord = self.board.find(|e| *e == ent).unwrap();
                 println!("Swapping {}, {}", selected_coord, new_coord);
                 if self.valid_move(selected_coord, new_coord) || self.valid_move(new_coord, selected_coord) {
-                    println!("This would match!");
+                    let (anim1, anim2) = Piece::swap_animations(selected_coord, new_coord);
+                    self.world.insert_one(selected, anim1).unwrap();
+                    self.world.insert_one(ent, anim2).unwrap();
                 }
                 self.selected = None;
                 self.world.remove_one::<Pulse>(selected).unwrap();

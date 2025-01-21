@@ -1,6 +1,7 @@
 use rand::{Rng, RngCore};
 use bananagraph::Sprite;
-use grid::Coord;
+use grid::{xy, Coord};
+use crate::animation::MoveAnimation;
 use crate::drawable::Drawable;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -66,5 +67,15 @@ impl Piece {
             coord.0 as f32 * 85.0 + margin.0,
             coord.1 as f32 * 85.0 + margin.1
         ))
+    }
+
+    pub fn swap_animations(coord: Coord, other_coord: Coord) -> (MoveAnimation, MoveAnimation) {
+        let dx = other_coord.0 - coord.0;
+        let dy = other_coord.1 - coord.1;
+        println!("dx {}, dy {}", dx, dy);
+        (
+            MoveAnimation::new(xy(85 * dx, 85 * dy)),
+            MoveAnimation::new(xy(-85 * dx, -85 * dy))
+        )
     }
 }

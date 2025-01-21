@@ -1,5 +1,6 @@
 use std::time::Duration;
 use cgmath::Vector2;
+use hecs::World;
 use grid::Coord;
 use crate::drawable::Drawable;
 
@@ -19,6 +20,12 @@ impl Pulse {
         Self {
             scale: 1.0,
             delta: 1.0
+        }
+    }
+
+    pub fn system(dt: Duration, world: &mut World) {
+        for (_ent, (anim,)) in world.query_mut::<(&mut Pulse,)>() {
+            anim.tick(dt);
         }
     }
 }
@@ -45,30 +52,43 @@ impl Animation for Pulse {
 #[derive(Copy, Clone, Debug)]
 pub struct MoveAnimation {
     dest: Vector2<f32>,
-    current: Vector2<f32>,
-    remaining_duration: Duration
+    duration: Duration,
+    elapsed: Duration
 }
 
 impl MoveAnimation {
     pub fn new(dest: Coord) -> Self {
         Self {
             dest: (dest.0 as f32, dest.1 as f32).into(),
-            current: (0.0, 0.0).into(),
-            remaining_duration: Duration::new(1, 0)
+            duration: Duration::new(0, 500000000),
+            elapsed: Duration::new(0, 0)
+        }
+    }
+
+    pub fn system(dt: Duration, world: &mut World) {
+        let mut finished = vec![];
+        for (ent, (anim,)) in world.query_mut::<(&mut MoveAnimation,)>() {
+            anim.tick(dt);
+            if !anim.running() { finished.push(ent) }
+        }
+        for ent in finished {
+            world.remove_one::<MoveAnimation>(ent).unwrap();
         }
     }
 
     pub fn running(&self) -> bool {
-        self.remaining_duration.is_zero()
+        self.duration > self.elapsed
     }
 }
 
 impl Animation for MoveAnimation {
     fn tick(&mut self, dt: Duration) {
-        todo!()
+        self.elapsed = (self.elapsed + dt).min(self.duration);
     }
 
     fn apply_to(&self, drawable: Drawable) -> Drawable {
-        todo!()
+        let fraction = self.elapsed.as_millis() as f32 / self.duration.as_millis() as f32;
+        println!("fraction: {}", fraction);
+        drawable.with_position_delta(self.dest * fraction)
     }
 }
