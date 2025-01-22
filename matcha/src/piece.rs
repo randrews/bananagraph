@@ -1,3 +1,4 @@
+use cgmath::Vector2;
 use rand::{Rng, RngCore};
 use bananagraph::Sprite;
 use grid::{xy, Coord};
@@ -31,17 +32,15 @@ impl PieceColor {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Piece {
     pub(crate) color: PieceColor,
+    pub(crate) position: Vector2<i32>
 }
 
 impl Piece {
-    pub fn new(color: PieceColor) -> Self {
+    pub fn new(color: PieceColor, position: impl Into<Vector2<i32>>) -> Self {
         Self {
-            color
+            color,
+            position: position.into()
         }
-    }
-
-    pub fn new_from_rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        Self::new(PieceColor::from_rand(rng))
     }
 
     pub fn base_sprite(&self) -> Sprite {
@@ -55,27 +54,27 @@ impl Piece {
         }
     }
 
-    pub fn as_drawable(&self, id: u32, coord: Coord, screen_size: (u32, u32)) -> Drawable {
+    pub fn as_drawable(&self, id: u32, screen_size: impl Into<Vector2<u32>>) -> Drawable {
+        let screen_size = screen_size.into();
         let sprite = self.base_sprite().with_z(0.5).with_id(id);
 
-        let margin = (
-            (screen_size.0 as f32 - 8.0 * 85.0) / 2.0,
-            (screen_size.1 as f32 - 8.0 * 85.0) / 2.0
+        let margin = Vector2::new(
+            (screen_size.x as f32 - 8.0 * 85.0) / 2.0,
+            (screen_size.y as f32 - 8.0 * 85.0) / 2.0
         );
 
         Drawable::new(sprite, (
-            coord.0 as f32 * 85.0 + margin.0,
-            coord.1 as f32 * 85.0 + margin.1
+            self.position.x as f32 * 85.0 + margin.x,
+            self.position.y as f32 * 85.0 + margin.y
         ))
     }
 
-    pub fn swap_animations(coord: Coord, other_coord: Coord) -> (MoveAnimation, MoveAnimation) {
-        let dx = other_coord.0 - coord.0;
-        let dy = other_coord.1 - coord.1;
-        println!("dx {}, dy {}", dx, dy);
+    pub fn swap_animations(piece1: Piece, piece2: Piece) -> (MoveAnimation, MoveAnimation) {
+        let d = piece2.position - piece1.position;
+        println!("dx {}, dy {}", d.x, d.y);
         (
-            MoveAnimation::new(xy(85 * dx, 85 * dy)),
-            MoveAnimation::new(xy(-85 * dx, -85 * dy))
+            MoveAnimation::new(xy(85 * d.x, 85 * d.y)),
+            MoveAnimation::new(xy(-85 * d.x, -85 * d.y))
         )
     }
 }

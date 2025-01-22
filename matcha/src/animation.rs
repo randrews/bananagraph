@@ -60,7 +60,7 @@ impl MoveAnimation {
     pub fn new(dest: Coord) -> Self {
         Self {
             dest: (dest.0 as f32, dest.1 as f32).into(),
-            duration: Duration::new(0, 500000000),
+            duration: Duration::from_millis(250),
             elapsed: Duration::new(0, 0)
         }
     }
@@ -88,7 +88,6 @@ impl Animation for MoveAnimation {
 
     fn apply_to(&self, drawable: Drawable) -> Drawable {
         let fraction = self.elapsed.as_millis() as f32 / self.duration.as_millis() as f32;
-        println!("fraction: {}", fraction);
         drawable.with_position_delta(self.dest * fraction)
     }
 }
