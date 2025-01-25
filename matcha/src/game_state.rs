@@ -78,16 +78,21 @@ impl<'a, R: Rng> GameState<'a, R> {
                     self.step = FallAnimation;
                 }
                 FallAnimation => {
-                    // Fall animations have now finished, put us back to the select step for the next move:
-                    self.step = self.find_next_matches()
+                    // Fall animations have now finished, see if there are more matches:
+                    self.step = if self.any_matches() {
+                                    self.fade_pieces();
+                                    FadeAnimation
+                                } else {
+                                    PieceSelection
+                                };
                 }
             }
         }
     }
 
-    pub fn find_next_matches(&mut self) -> CaptureSteps {
-        PieceSelection
-        // todo
+    pub fn any_matches(&mut self) -> bool {
+        let board = self.board_from_world();
+        board.find_match().is_some()
     }
 
     /// Apply a fade animation to all captured pieces

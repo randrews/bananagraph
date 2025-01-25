@@ -42,18 +42,31 @@ pub trait MatchaBoard {
                 false
             };
 
+            let mut m = vec![];
+            if is_horiz_match || is_vert_match { m.push(coord) }
             if is_horiz_match {
-                let mut m = vec![coord, coord.east(), coord.east().east()];
-                if right3.is_some_and(|c| c == color) { m.push(coord.east().east().east()) }
-                if right4.is_some_and(|c| c == color) { m.push(coord.east().east().east().east()) }
-                Some(m)
-            } else if is_vert_match {
-                let mut m = vec![coord, coord.south(), coord.south().south()];
-                if down3.is_some_and(|c| c == color) { m.push(coord.south().south().south()) }
-                if down4.is_some_and(|c| c == color) { m.push(coord.south().south().south().south()) }
-                Some(m)
-            } else {
+                m.append(&mut vec![coord.east(), coord.east().east()]);
+                if right3.is_some_and(|c| c == color) {
+                    m.push(coord.east().east().east());
+                    if right4.is_some_and(|c| c == color) {
+                        m.push(coord.east().east().east().east())
+                    }
+                }
+            }
+            if is_vert_match {
+                m.append(&mut vec![coord.south(), coord.south().south()]);
+                if down3.is_some_and(|c| c == color) {
+                    m.push(coord.south().south().south());
+                    if down4.is_some_and(|c| c == color) {
+                        m.push(coord.south().south().south().south())
+                    }
+                }
+            }
+
+            if m.is_empty() {
                 None
+            } else {
+                Some(m)
             }
         } else {
             None
