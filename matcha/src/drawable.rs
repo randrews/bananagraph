@@ -1,5 +1,5 @@
 use bananagraph::{DrawingContext, Sprite};
-use cgmath::{Deg, Vector2};
+use cgmath::{Deg, Vector2, Vector4};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Drawable {
@@ -33,6 +33,13 @@ impl Drawable {
     pub fn with_scale(self, scale: impl Into<Vector2<f32>>) -> Self {
         Self {
             scale: scale.into(),
+            ..self
+        }
+    }
+
+    pub fn with_tint(self, tint: impl Into<Vector4<f32>>) -> Self {
+        Self {
+            sprite: self.sprite.with_tint(tint),
             ..self
         }
     }

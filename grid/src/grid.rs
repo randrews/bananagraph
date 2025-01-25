@@ -39,6 +39,21 @@ pub trait Grid {
         xy(n as i32 % width, n as i32 / width)
     }
 
+    /// The opposite of `coord`: returns `n` for a given coord in the grid, in reading order:
+    /// left-to-right, top-to-bottom. If the govin coord is not in the grid, returns None
+    /// ```
+    /// # use grid::*;
+    /// let grid = VecGrid::new(xy(5, 5), 0);
+    /// let n = grid.nth(xy(3, 2));
+    /// ```
+    fn nth(&self, point: Coord) -> Option<usize> {
+        if self.contains(point) {
+            Some((point.0 + point.1 * self.size().0) as usize)
+        } else {
+            None
+        }
+    }
+
     fn iter(&self) -> impl Iterator<Item=&Self::CellType> {
         let num_cells = (self.size().1 * self.size().0) as usize;
         (0..num_cells).map(|n| self.get(self.coord(n)).unwrap())

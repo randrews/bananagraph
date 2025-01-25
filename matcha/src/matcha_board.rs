@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use lazy_static::lazy_static;
 use grid::{xy, Coord, Grid, VecGrid};
 use rand::Rng;

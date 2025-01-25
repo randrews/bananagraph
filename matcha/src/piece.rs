@@ -12,7 +12,8 @@ pub enum PieceColor {
     GREEN,
     BLUE,
     PINK,
-    PURPLE
+    PURPLE,
+    EMPTY, // A placeholder for a blank cell; should never be assigned to a component or seen
 }
 
 impl PieceColor {
@@ -37,6 +38,7 @@ pub struct Piece {
 
 impl Piece {
     pub fn new(color: PieceColor, position: impl Into<Vector2<i32>>) -> Self {
+        assert_ne!(color, PieceColor::EMPTY);
         Self {
             color,
             position: position.into()
@@ -51,6 +53,7 @@ impl Piece {
             PieceColor::BLUE => Sprite::new((160, 80), (80, 80)),
             PieceColor::PINK => Sprite::new((320, 160), (80, 80)),
             PieceColor::PURPLE => Sprite::new((400, 240), (80, 80)),
+            PieceColor::EMPTY => unreachable!()
         }
     }
 
@@ -71,7 +74,6 @@ impl Piece {
 
     pub fn swap_animations(piece1: Piece, piece2: Piece) -> (MoveAnimation, MoveAnimation) {
         let d = piece2.position - piece1.position;
-        println!("dx {}, dy {}", d.x, d.y);
         (
             MoveAnimation::new(xy(85 * d.x, 85 * d.y)),
             MoveAnimation::new(xy(-85 * d.x, -85 * d.y))
