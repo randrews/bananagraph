@@ -1,9 +1,7 @@
-use std::collections::BTreeSet;
 use lazy_static::lazy_static;
 use grid::{xy, Coord, Grid, VecGrid};
 use rand::Rng;
-use crate::game_state::GameState;
-use crate::piece::{Piece, PieceColor};
+use crate::piece::PieceColor;
 
 lazy_static! {
     static ref VALID_MOVES: Vec<(Coord, Coord, Coord)> = all_valid_moves();

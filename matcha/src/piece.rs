@@ -1,7 +1,7 @@
 use cgmath::Vector2;
-use rand::{Rng, RngCore};
+use rand::Rng;
 use bananagraph::Sprite;
-use grid::{xy, Coord};
+use grid::xy;
 use crate::animation::MoveAnimation;
 use crate::drawable::Drawable;
 

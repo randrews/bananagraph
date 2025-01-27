@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use cgmath::Deg;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
-use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
+use winit::event::{Event, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
 
 pub async fn run_window() -> Result<(), EventLoopError> {
@@ -21,10 +21,6 @@ pub async fn run_window() -> Result<(), EventLoopError> {
     let our_id = window.id();
 
     let timer_length = Duration::from_millis(20);
-
-    // The mouse position is a float, but seems to still describe positions within the same coord
-    // space as the window, so just floor()ing it gives you reasonable coordinates
-    let mut mouse_pos: (f64, f64) = (-1f64, -1f64);
 
     event_loop.run(move |event, target| {
         match event {
@@ -52,25 +48,13 @@ pub async fn run_window() -> Result<(), EventLoopError> {
                 target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
             }
 
-            // Update that the mouse moved if it did
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position: pos, device_id: _ },
-                window_id
-            } if window_id == our_id => {
-                mouse_pos = (pos.x, pos.y);
-            }
-
-            Event::WindowEvent {
-                window_id, event: WindowEvent::MouseInput { device_id: _, state: ElementState::Pressed, button: MouseButton::Left }
-            } if window_id == our_id => {}
-
             _ => {} // toss the others
         }
     })
 }
 
 fn redraw(wrapper: &GpuWrapper) {
-    let (w, h) = (400.0, 225.0);
+    // let (w, h) = (400.0, 225.0);
     // let sprite = Sprite::new((0, 0), (32, 32))
     //     //.translate((-0.5, -0.5))
     //     //.scale((32.0, 32.0))

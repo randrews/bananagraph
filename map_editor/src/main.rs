@@ -2,7 +2,7 @@ use bananagraph::{DrawingContext, GpuWrapper, Sprite};
 use std::time::{Duration, Instant};
 use cgmath::num_traits::Pow;
 use cgmath::Vector2;
-use rand::{Rng, RngCore};
+use rand::Rng;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
@@ -107,7 +107,7 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     let base_dc = DrawingContext::new((wrapper.logical_size.0 as f32, wrapper.logical_size.1 as f32));
 
     let dims = iso_map.dimensions();
-    let (dc) = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
+    let dc = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
 
     let mut sprites = iso_map.sprites(dc);
     let mut buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
@@ -127,7 +127,7 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
             let board_coord = sprite_id_to_coord(id, board.size().0);
             match board.get(board_coord.into()) {
                 Some(Cell::White | Cell::Black) => {
-                    let highlight = highlight_sprites(board_coord);
+                    let highlight = highlight_sprites();
                     let z = iso_map.z_coord(board_coord.into());
                     sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord.into(), &dc));
                     sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord.into(), &dc));
@@ -152,7 +152,7 @@ fn create_background(size: usize) -> Vec<u8> {
     for y in 0..size {
         for x in 0..size {
             let distance: f32 = ((x as f32 - center).pow(2.0) + (y as f32 - center).pow(2.0)).sqrt() / max_distance;
-            let distance = distance + (rng.gen::<f32>() - 0.5) / 10.0;
+            let distance = distance + (rng.random::<f32>() - 0.5) / 10.0;
             let val = (distance * 255.0) as u8;
             texture[(x + size * y) * 4 .. (x + size * y) * 4 + 4].copy_from_slice(&[val, val, val, 0xff])
         }
@@ -166,7 +166,7 @@ fn create_background(size: usize) -> Vec<u8> {
 /// MMs are 5% margin columns; AA is a toolbar / status bar, BB is the map.
 /// We want to devote most of the width to the map, so, let's say 0.65 map and 0.2 sidebar.
 /// We would like to scale the map so it fits in that rectangle:
-fn create_drawing_contexts(dims: Vector2<f32>, base_dc: DrawingContext) -> (DrawingContext) {
+fn create_drawing_contexts(dims: Vector2<f32>, base_dc: DrawingContext) -> DrawingContext {
     let screen_proportion = 0.65; // The fraction of the screen width we devote to the map
     // We want to scale by the same factor, width and height, so whichever of those will fill the screen
     // with the lowest factor, that's what we use for both.
@@ -211,7 +211,7 @@ fn sprite_id_to_coord(id: u32, width: i32) -> (i32, i32) {
     ((id - 100000) as i32 % width, (id - 100000) as i32 / width)
 }
 
-fn highlight_sprites(coord: (i32, i32)) -> (Sprite, Sprite) {
+fn highlight_sprites() -> (Sprite, Sprite) {
     let toph = Sprite::new((416, 0), (32, 48));
     let btmh = Sprite::new((384, 0), (32, 48));
     (

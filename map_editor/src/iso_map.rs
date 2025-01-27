@@ -45,6 +45,7 @@ pub struct IsoMap<'a, T: AsSprite, G: Grid<CellType=T>> {
     base_size: PixelDimension,
 }
 
+#[allow(unused)]
 impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
     pub fn new(grid: &'a G, sprite_size: impl Into<PixelDimension>, base_size: impl Into<PixelDimension>) -> Self {
         let sprite_size = sprite_size.into();

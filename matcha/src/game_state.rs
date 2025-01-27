@@ -30,7 +30,6 @@ pub struct GameState<'a, R: Rng> {
     rng: &'a mut R,
     screen: (u32, u32),
     selected: Option<Entity>,
-    swapped: Option<Entity>,
     step: CaptureSteps
 }
 
@@ -45,16 +44,13 @@ impl<'a, R: Rng> GameState<'a, R> {
             world.spawn((Piece::new(*color, (c.0, c.1)),));
         }
 
-        let mut state = Self {
+        Self {
             world,
             rng,
             screen,
             selected: None,
-            swapped: None,
             step: PieceSelection
-        };
-
-        state
+        }
     }
 
     pub fn tick(&mut self, dt: Duration) {
@@ -168,7 +164,7 @@ impl<'a, R: Rng> GameState<'a, R> {
         let board = self.board_from_world();
 
         let mut captured = BTreeSet::new();
-        for (n, color) in board.iter().enumerate() {
+        for (n, _color) in board.iter().enumerate() {
             let c = board.coord(n);
             if let Some(pieces) = board.is_match(c) {
                 for c in pieces.into_iter() {
@@ -249,7 +245,7 @@ impl<'a, R: Rng> GameState<'a, R> {
 
     fn board_from_world(&self) -> VecGrid<PieceColor> {
         let mut board = VecGrid::new(xy(8, 8), EMPTY);
-        for (_ent, (piece)) in self.world.query::<&Piece>().into_iter() {
+        for (_ent, piece) in self.world.query::<&Piece>().into_iter() {
             board[xy(piece.position.x, piece.position.y)] = piece.color;
         }
         board
@@ -257,7 +253,7 @@ impl<'a, R: Rng> GameState<'a, R> {
 
     fn entity_grid_from_world(&self) -> VecGrid<Entity> {
         let mut grid = VecGrid::new(xy(8, 8), Entity::DANGLING);
-        for (ent, (piece)) in self.world.query::<&Piece>().into_iter() {
+        for (ent, piece) in self.world.query::<&Piece>().into_iter() {
             grid[xy(piece.position.x, piece.position.y)] = ent;
         }
         grid

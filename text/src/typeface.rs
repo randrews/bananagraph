@@ -17,7 +17,6 @@ pub struct TypefaceBuilder {
 
 #[derive(Clone)]
 pub struct Typeface {
-    pub(crate) layer: u32,
     pub(crate) glyphs: BTreeMap<char, Glyph>
 }
 
@@ -33,7 +32,8 @@ pub struct Glyph {
     pub size: Vector2<u32>
 }
 
-trait AddTexture {
+/// A trait to allow us to create TypefaceBuilders without a real GPU wrapper (tests)
+pub trait AddTexture {
     fn add_texture_from_array(&mut self, bytes: Vec<u8>, width: u32, name: Option<&str>) -> u32;
 }
 
@@ -120,7 +120,6 @@ impl TypefaceBuilder {
         let layer = gpu_wrapper.add_texture_from_array(Vec::from(self.image.as_bytes()), self.image.width(), None);
         let glyphs = self.glyphs.into_iter().map(|(ch, glyph)| (ch, glyph.with_layer(layer))).collect();
         Typeface {
-            layer,
             glyphs
         }
     }
@@ -133,7 +132,6 @@ impl Typeface {
         let at = at.into();
         for (n, ch) in s.into().chars().into_iter().enumerate() {
             if let Some(glyph) = self.glyphs.get(&ch) {
-                println!("{}: size: ({}, {})", ch, glyph.size.x, glyph.size.y);
                 let sprite = dc.place(glyph.sprite, (
                     at.x + x + n as f32,
                     at.y + glyph.offset.y as f32

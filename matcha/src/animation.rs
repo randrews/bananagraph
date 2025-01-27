@@ -1,6 +1,6 @@
 use std::time::Duration;
 use cgmath::Vector2;
-use hecs::{Query, World};
+use hecs::World;
 use grid::Coord;
 use crate::drawable::Drawable;
 

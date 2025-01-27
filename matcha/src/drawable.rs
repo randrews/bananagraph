@@ -9,6 +9,7 @@ pub struct Drawable {
     pub(crate) position: Vector2<f32>
 }
 
+#[allow(unused)]
 impl Drawable {
     pub fn new(sprite: Sprite, position: impl Into<Vector2<f32>>) -> Self {
         Self {
