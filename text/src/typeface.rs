@@ -109,7 +109,7 @@ impl TypefaceBuilder {
         let (size, topleft) = (size.into(), topleft.into());
         let line = line.into();
         let separation = separation.unwrap_or(0);
-        for (n, ch) in line.chars().into_iter().enumerate() {
+        for (n, ch) in line.chars().enumerate() {
             let n = n as u32;
             let topleft = Point2::new(topleft.x + n * (size.x + separation), topleft.y);
             self.add_glyph(ch, size, topleft)
@@ -130,16 +130,16 @@ impl Typeface {
         let mut sprites = vec![];
         let mut x = 0f32;
         let at = at.into();
-        for (n, ch) in s.into().chars().into_iter().enumerate() {
+        for (n, ch) in s.into().chars().enumerate() {
             if let Some(glyph) = self.glyphs.get(&ch) {
                 let sprite = dc.place(glyph.sprite, (
                     at.x + x + n as f32,
                     at.y + glyph.offset.y as f32
                 ));
                 sprites.push(sprite);
-                x = x + glyph.size.x as f32;
+                x += glyph.size.x as f32;
             } else {
-                x = x + 8.0; // Just leave a blank space...
+                x += 8.0; // Just leave a blank space...
             }
         }
         sprites
@@ -161,23 +161,25 @@ mod tests {
 
     struct TestGpu {}
     impl AddTexture for TestGpu {
-        fn add_texture_from_array(&mut self, bytes: Vec<u8>, width: u32, name: Option<&str>) -> u32 {
+        fn add_texture_from_array(&mut self, _bytes: Vec<u8>, _width: u32, _name: Option<&str>) -> u32 {
             0
         }
     }
 
+    #[test]
     fn test_create_builder() {
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
         builder.add_glyph('a', (7, 15), (1, 65));
         let tf: Typeface = builder.into_typeface(&mut TestGpu {});
         let g = tf.glyphs.get(&'a').unwrap();
-        assert_eq!(g.size, (5, 5).into());
-        assert_eq!(g.offset, (0, 4).into());
+        assert_eq!(g.size, (5, 4).into());
+        assert_eq!(g.offset, (0, -11).into());
         assert_eq!(g.sprite.layer, 0);
         assert_eq!(g.sprite.origin, (1, 65).into());
         assert_eq!(g.sprite.size, (7, 15).into());
     }
 
+    #[test]
     fn test_add_glyphs() {
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
         builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
@@ -185,9 +187,10 @@ mod tests {
         assert_eq!(tf.glyphs.len(), 8);
 
         let g = tf.glyphs.get(&'h').unwrap();
-        assert_eq!(g.size.x, 5);
+        assert_eq!(g.size.x, 4);
     }
 
+    #[test]
     fn test_print() {
         let dc = DrawingContext::new((100.0, 100.0));
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);

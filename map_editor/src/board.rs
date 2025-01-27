@@ -35,9 +35,7 @@ impl Board {
 
         for (n, cell) in cells.iter_mut().enumerate() {
             let (x, y) = (n % width as usize, n / width as usize);
-            *cell = if x == 0 || y == 0 {
-                Cell::TallWall
-            } else if x == (width - 1) as usize || y == (height - 1) as usize {
+            *cell = if x == 0 || y == 0 || x == (width - 1) as usize || y == (height - 1) as usize {
                 Cell::TallWall
             } else {
                 Board::square_color((x as i32, y as i32))

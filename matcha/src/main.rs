@@ -76,13 +76,13 @@ pub async fn run_window() -> Result<(), EventLoopError> {
                 window_id, event: WindowEvent::MouseInput { device_id: _, state: ElementState::Pressed, button: MouseButton::Left }
             } if window_id == our_id => {
                 game_state.click(match &id_buffer {
-                    None => ClickTarget::LOCATION { location: mouse_pos },
+                    None => ClickTarget::Location { location: mouse_pos },
                     Some(buf) => {
                         let id = *buf.index(mouse_pos);
                         if id == 0 {
-                            ClickTarget::LOCATION { location: mouse_pos }
+                            ClickTarget::Location { location: mouse_pos }
                         } else {
-                            ClickTarget::SPRITE { id }
+                            ClickTarget::Sprite { id }
                         }
                     }
                 })

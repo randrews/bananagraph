@@ -49,7 +49,7 @@ impl Texture {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &diffuse_rgba,
+            diffuse_rgba,
             ImageDataLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * dimensions.0),
@@ -88,11 +88,11 @@ impl Texture {
 
     /// Create a texture suitable for use as a depth texture
     pub fn create_depth_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        Self::generic_texture(&device, &config, Some("depth texture"), TextureFormat::Depth32Float, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
+        Self::generic_texture(device, config, Some("depth texture"), TextureFormat::Depth32Float, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
     }
 
     /// Create a texture for the ID shader to use as its output
     pub fn create_id_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        Self::generic_texture(&device, &config, Some("id texture"), TextureFormat::R32Uint, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC)
+        Self::generic_texture(device, config, Some("id texture"), TextureFormat::R32Uint, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC)
     }
 }

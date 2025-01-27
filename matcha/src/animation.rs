@@ -37,10 +37,10 @@ impl Animation for Pulse {
         let mut new_scale = self.scale + self.delta * (bounds * dt.as_millis() as f32 / 200.0);
         if self.delta < 0.0 && new_scale <= 1.0 - bounds {
             new_scale = 1.0 - bounds;
-            self.delta = self.delta * -1.0;
+            self.delta *= -1.0;
         } else if self.delta > 0.0 && new_scale >= 1.0 + bounds {
             new_scale = 1.0 + bounds;
-            self.delta = self.delta * -1.0;
+            self.delta *= -1.0;
         }
         self.scale = new_scale;
     }

@@ -170,7 +170,7 @@ fn all_valid_moves() -> Vec<(Coord, Coord, Coord)> {
 
 impl MatchaBoard for VecGrid<PieceColor> {
     fn get(&self, coord: Coord) -> Option<PieceColor> {
-        Grid::get(self, coord).map(|p| *p)
+        Grid::get(self, coord).copied()
     }
 
     fn set(&mut self, coord: Coord, color: PieceColor) {

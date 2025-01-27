@@ -81,12 +81,12 @@ impl From<&str> for VecGrid<char> {
     }
 }
 
-impl Into<String> for VecGrid<char> {
-    fn into(self) -> String {
-        let mut s = String::with_capacity(((self.size().0 + 1) * self.size().1) as usize);
-        for pt in self.size() {
+impl From<VecGrid<char>> for String {
+    fn from(value: VecGrid<char>) -> Self {
+        let mut s = String::with_capacity(((value.size().0 + 1) * value.size().1) as usize);
+        for pt in value.size() {
             if pt.0 == 0 && pt.1 > 0 { s.push('\n') }
-            s.push(self[pt])
+            s.push(value[pt])
         }
         s
     }

@@ -245,7 +245,7 @@ impl<'a> GpuWrapper<'a> {
             }),
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: shader,
                 entry_point: "fs_main",
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
@@ -320,7 +320,7 @@ impl<'a> GpuWrapper<'a> {
             }),
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: shader,
                 entry_point: "fs_id",
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
@@ -426,7 +426,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// Queues a call to an arbitrary shader pipeline, targeting an arbitrary texture view. It will
     /// iterate over the given instances for the unit-square-vertex-buffer.
-    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
+    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
@@ -471,12 +471,12 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// Queues a call to the render shader, which outputs color data to the surface
-    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>, surface: &wgpu::SurfaceTexture) {
+    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], surface: &wgpu::SurfaceTexture) {
         self.call_shader(encoder, instances, layers, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
     }
 
     /// Queues a call to the id shader, which outputs sprite ids to id_texture
-    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &Vec<u32>) {
+    fn call_id_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32]) {
         let target = self.id_texture.texture.create_view(&wgpu::TextureViewDescriptor {
             format: Some(TextureFormat::R32Uint),
             ..Default::default()

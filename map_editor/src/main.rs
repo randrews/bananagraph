@@ -116,7 +116,7 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
         let id = buffer[mouse_pos.into()];
         if id >= 100000 {
             let board_coord = sprite_id_to_coord(id, board.size().0);
-            sprites = shorten_walls(&board, board_coord, sprites);
+            sprites = shorten_walls(board, board_coord, sprites);
             buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
         }
     }
@@ -125,14 +125,11 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
         let id = buffer[mouse_pos.into()];
         if id >= 100000 {
             let board_coord = sprite_id_to_coord(id, board.size().0);
-            match board.get(board_coord.into()) {
-                Some(Cell::White | Cell::Black) => {
-                    let highlight = highlight_sprites();
-                    let z = iso_map.z_coord(board_coord.into());
-                    sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord.into(), &dc));
-                    sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord.into(), &dc));
-                },
-                _ => {}
+            if let Some(Cell::White | Cell::Black) = board.get(board_coord.into()) {
+                let highlight = highlight_sprites();
+                let z = iso_map.z_coord(board_coord.into());
+                sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord.into(), &dc));
+                sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord.into(), &dc));
             }
         }
     }

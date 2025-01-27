@@ -131,9 +131,9 @@ impl Add for PixelCoord {
     }
 }
 
-impl Into<Point<i32>> for Coord {
-    fn into(self) -> Point<i32> {
-        Point::from((self.0, self.1))
+impl From<Coord> for Point<i32> {
+    fn from(value: Coord) -> Self {
+        Point::from((value.0, value.1))
     }
 }
 impl From<Point<i32>> for Coord {
