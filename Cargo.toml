@@ -1,6 +1,9 @@
 [workspace]
 members = [
-    "bananagraph", "example", "grid",
-    "map_editor"
-, "matcha"]
+    "bananagraph",
+    "example",
+    "grid",
+    "map_editor",
+    "matcha",
+    "text"]
 resolver = "2"
