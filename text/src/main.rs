@@ -63,8 +63,10 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 }
 
 fn redraw(tf: &Typeface) -> Vec<Sprite> {
-    let dc = DrawingContext::new((160.0, 120.0));
-    tf.print(dc, (0.0, 60.0), "hello world")
+    let dc = DrawingContext::new((320.0, 240.0));
+    let mut sprites = tf.print(dc, (0.0, 40.0), "anyone feel like diving tonight");
+    sprites.append(&mut tf.print(dc, (0.0, 60.0), "if not i can keep working on my text renderer"));
+    sprites
 }
 
 pub fn main() {

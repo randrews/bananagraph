@@ -1,6 +1,6 @@
 use std::time::Duration;
 use cgmath::Vector2;
-use hecs::World;
+use hecs::{Component, World};
 use grid::Coord;
 use crate::drawable::Drawable;
 
@@ -8,6 +8,17 @@ pub trait Animation {
     fn tick(&mut self, dt: Duration);
     fn apply_to(&self, drawable: Drawable) -> Drawable;
     fn running(&self) -> bool;
+}
+
+pub fn animation_system<T: Animation + Component + Send + Sync>(dt: Duration, world: &mut World) {
+    let mut finished = vec![];
+    for (ent, (anim,)) in world.query_mut::<(&mut T,)>() {
+        anim.tick(dt);
+        if !anim.running() { finished.push(ent) }
+    }
+    for ent in finished {
+        world.remove_one::<T>(ent).unwrap();
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -21,12 +32,6 @@ impl Pulse {
         Self {
             scale: 1.0,
             delta: 1.0
-        }
-    }
-
-    pub fn system(dt: Duration, world: &mut World) {
-        for (_ent, (anim,)) in world.query_mut::<(&mut Pulse,)>() {
-            anim.tick(dt);
         }
     }
 }
@@ -69,17 +74,6 @@ impl MoveAnimation {
             elapsed: Duration::new(0, 0)
         }
     }
-
-    pub fn system(dt: Duration, world: &mut World) {
-        let mut finished = vec![];
-        for (ent, (anim,)) in world.query_mut::<(&mut MoveAnimation,)>() {
-            anim.tick(dt);
-            if !anim.running() { finished.push(ent) }
-        }
-        for ent in finished {
-            world.remove_one::<MoveAnimation>(ent).unwrap();
-        }
-    }
 }
 
 impl Animation for MoveAnimation {
@@ -108,17 +102,6 @@ impl Fade {
         Self {
             duration: Duration::from_millis(250),
             elapsed: Duration::new(0, 0)
-        }
-    }
-
-    pub fn system(dt: Duration, world: &mut World) {
-        let mut finished = vec![];
-        for (ent, (anim,)) in world.query_mut::<(&mut Fade,)>() {
-            anim.tick(dt);
-            if !anim.running() { finished.push(ent) }
-        }
-        for ent in finished {
-            world.remove_one::<Fade>(ent).unwrap();
         }
     }
 }

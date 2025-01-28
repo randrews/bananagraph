@@ -5,7 +5,7 @@ use hecs::{Entity, World};
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
 use grid::{xy, Grid, VecGrid};
-use crate::animation::{Animation, Fade, MoveAnimation, Pulse};
+use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
 use crate::game_state::CaptureSteps::{FadeAnimation, FallAnimation, PieceSelection, SwapAnimation};
 use crate::matcha_board::MatchaBoard;
 use crate::piece::{Piece, PieceColor};
@@ -55,9 +55,12 @@ impl<'a, R: Rng> GameState<'a, R> {
 
     pub fn tick(&mut self, dt: Duration) {
         // Go through all the animation types
-        Pulse::system(dt, &mut self.world);
-        MoveAnimation::system(dt, &mut self.world);
-        Fade::system(dt, &mut self.world);
+        animation_system::<Pulse>(dt, &mut self.world);
+        animation_system::<MoveAnimation>(dt, &mut self.world);
+        animation_system::<Fade>(dt, &mut self.world);
+        // Pulse::system(dt, &mut self.world);
+        // MoveAnimation::system(dt, &mut self.world);
+        // Fade::system(dt, &mut self.world);
 
         // Only way this happens is the first tick after the move animations finish, so,
         // it's time to actually swap the pieces and do captures:
