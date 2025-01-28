@@ -147,7 +147,7 @@ impl Typeface {
         let mut sprites = vec![];
         let mut x = 0f32;
         let mut at = at.into();
-        for (n, ch) in s.into().chars().enumerate() {
+        for ch in s.into().chars() {
             if ch == '\n' {
                 x = at.x;
                 at.y += self.height as f32 + 1f32;
