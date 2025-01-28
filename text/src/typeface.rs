@@ -12,12 +12,17 @@ pub struct TypefaceBuilder {
 
     /// When we print a line, the y coord will be the baseline of the text. This is
     /// how far above the bottom of each glyph's rect (in the image) the baseline is
-    baseline: u32
+    baseline: u32,
+
+    /// How many pixels above the baseline the tallest characters extend: this is also
+    /// (plus a 1px margin) how far down we'll move to do a crlf
+    height: u32,
 }
 
 #[derive(Clone)]
 pub struct Typeface {
-    pub(crate) glyphs: BTreeMap<char, Glyph>
+    pub(crate) glyphs: BTreeMap<char, Glyph>,
+    height: u32
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -44,17 +49,21 @@ impl AddTexture for GpuWrapper<'_> {
 }
 
 impl TypefaceBuilder {
-    pub fn new(img_bytes: &[u8], baseline: u32) -> Self {
+    /// Creates a new typefacebuilder which will read glyphs from a bitmap
+    /// - `img_bytes` is the raw (probably png-encoded) bytes of the image
+    /// - `glyph_color` is the color in the image that represents a glyph; other-color pixels are replaced with transparent
+    /// - `baseline` and `height`, see `TypefaceBuilder`
+    pub fn new(img_bytes: &[u8], glyph_color: [u8; 4], baseline: u32, height: u32) -> Self {
         let mut image = image::load_from_memory(img_bytes).expect("Image could not be parsed for typeface");
 
         // In order to have a texture we can tint, every pixel in it needs to be either transparent or pure white:
         for y in 0..image.height() {
             for x in 0..image.width() {
                 let pix = image.get_pixel(x, y);
-                if pix.0[3] == 0 {
-                    image.put_pixel(x, y, [0, 0, 0, 0].into())
-                } else {
+                if pix.0[0] == glyph_color[0] && pix.0[1] == glyph_color[1] && pix.0[2] == glyph_color[2] && pix.0[3] == glyph_color[3] {
                     image.put_pixel(x, y, [0xff, 0xff, 0xff, 0xff].into())
+                } else {
+                    image.put_pixel(x, y, [0, 0, 0, 0].into())
                 }
             }
         }
@@ -63,6 +72,7 @@ impl TypefaceBuilder {
         Self {
             image,
             baseline,
+            height,
             glyphs: BTreeMap::new()
         }
     }
@@ -105,6 +115,12 @@ impl TypefaceBuilder {
         self.glyphs.insert(ch, glyph);
     }
 
+    pub fn set_x_offset(&mut self, ch: char, offset: i32) {
+        if let Some(glyph) = self.glyphs.get_mut(&ch) {
+            glyph.offset.x = offset
+        }
+    }
+
     pub fn add_glyphs<'a>(&mut self, line: impl Into<&'a str>, size: impl Into<Vector2<u32>>, topleft: impl Into<Point2<u32>>, separation: Option<u32>) {
         let (size, topleft) = (size.into(), topleft.into());
         let line = line.into();
@@ -120,7 +136,8 @@ impl TypefaceBuilder {
         let layer = gpu_wrapper.add_texture_from_array(Vec::from(self.image.as_bytes()), self.image.width(), None);
         let glyphs = self.glyphs.into_iter().map(|(ch, glyph)| (ch, glyph.with_layer(layer))).collect();
         Typeface {
-            glyphs
+            glyphs,
+            height: self.height
         }
     }
 }
@@ -129,15 +146,19 @@ impl Typeface {
     pub fn print<'a>(&self, dc: DrawingContext, at: impl Into<Vector2<f32>>, s: impl Into<&'a str>) -> Vec<Sprite> {
         let mut sprites = vec![];
         let mut x = 0f32;
-        let at = at.into();
+        let mut at = at.into();
         for (n, ch) in s.into().chars().enumerate() {
-            if let Some(glyph) = self.glyphs.get(&ch) {
+            if ch == '\n' {
+                x = at.x;
+                at.y += self.height as f32 + 1f32;
+            }
+            else if let Some(glyph) = self.glyphs.get(&ch) {
                 let sprite = dc.place(glyph.sprite, (
-                    at.x + x + n as f32,
+                    at.x + x + glyph.offset.x as f32,
                     at.y + glyph.offset.y as f32
                 ));
                 sprites.push(sprite);
-                x += glyph.size.x as f32;
+                x += glyph.size.x as f32 + glyph.offset.x as f32 + 1f32;
             } else {
                 x += 8.0; // Just leave a blank space...
             }
@@ -168,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_create_builder() {
-        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
+        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 7);
         builder.add_glyph('a', (7, 15), (1, 65));
         let tf: Typeface = builder.into_typeface(&mut TestGpu {});
         let g = tf.glyphs.get(&'a').unwrap();
@@ -181,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_add_glyphs() {
-        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
+        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 7);
         builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
         let tf: Typeface = builder.into_typeface(&mut TestGpu {});
         assert_eq!(tf.glyphs.len(), 8);
@@ -193,7 +214,7 @@ mod tests {
     #[test]
     fn test_print() {
         let dc = DrawingContext::new((100.0, 100.0));
-        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
+        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 7);
         builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
         builder.add_glyphs("ijklmnop", (7, 15), (1, 81), Some(1));
         let tf: Typeface = builder.into_typeface(&mut TestGpu {});

@@ -20,11 +20,13 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
     let mut wrapper = GpuWrapper::new(&window, size).await;
 
-    let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), 4);
+    let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
     builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
     builder.add_glyphs("ijklmnop", (7, 15), (1, 81), Some(1));
     builder.add_glyphs("qrstuvwx", (7, 15), (1, 97), Some(1));
     builder.add_glyphs("yz", (7, 15), (1, 113), Some(1));
+    builder.set_x_offset('p', -3);
+    builder.set_x_offset('j', -3);
     builder.add_sized_glyph(' ', (3, 1), (17, 113));
     let tf: Typeface = builder.into_typeface(&mut wrapper);
 
@@ -63,10 +65,8 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 }
 
 fn redraw(tf: &Typeface) -> Vec<Sprite> {
-    let dc = DrawingContext::new((320.0, 240.0));
-    let mut sprites = tf.print(dc, (0.0, 40.0), "anyone feel like diving tonight");
-    sprites.append(&mut tf.print(dc, (0.0, 60.0), "if not i can keep working on my text renderer"));
-    sprites
+    let dc = DrawingContext::new((160.0, 120.0));
+    tf.print(dc, (0.0, 40.0), "i made a thing to render\nvariable width bitmap fonts")
 }
 
 pub fn main() {
