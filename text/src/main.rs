@@ -10,15 +10,15 @@ use crate::typeface::{Typeface, TypefaceBuilder};
 
 pub async fn run_window() -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
-    let size = (640, 480);
+    let min_size = (80, 60);
 
     let window = winit::window::WindowBuilder::new()
         .with_title("Text example")
-        .with_inner_size(LogicalSize { width: size.0, height: size.1 })
-        .with_min_inner_size(LogicalSize { width: size.0 / 8, height: size.1 / 8 })
+        .with_inner_size(LogicalSize { width: min_size.0 * 8, height: min_size.1 * 8})
+        .with_min_inner_size(LogicalSize { width: min_size.0, height: min_size.1 })
         .build(&event_loop)?;
 
-    let mut wrapper = GpuWrapper::new(&window, size).await;
+    let mut wrapper = GpuWrapper::new(&window, min_size).await;
 
     let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
     builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
