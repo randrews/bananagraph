@@ -1,7 +1,6 @@
 use std::time::Duration;
 use cgmath::Vector2;
 use hecs::{Component, World};
-use grid::Coord;
 use crate::drawable::Drawable;
 
 pub trait Animation {
@@ -67,9 +66,10 @@ pub struct MoveAnimation {
 }
 
 impl MoveAnimation {
-    pub fn new(start: Coord) -> Self {
+    pub fn new(start: impl Into<Vector2<i32>>) -> Self {
+        let start = start.into();
         Self {
-            start: (start.0 as f32, start.1 as f32).into(),
+            start: (start.x as f32, start.y as f32).into(),
             duration: Duration::from_millis(250),
             elapsed: Duration::new(0, 0)
         }

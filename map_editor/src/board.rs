@@ -1,5 +1,6 @@
+use cgmath::Vector2;
 use bananagraph::Sprite;
-use grid::{xy, Coord, Grid, GridMut};
+use grid::{Grid, GridMut};
 use crate::iso_map::AsSprite;
 
 #[derive(Copy, Clone, Debug)]
@@ -58,17 +59,18 @@ impl Board {
 impl Grid for Board {
     type CellType = Cell;
 
-    fn size(&self) -> Coord {
-        xy(self.width, self.height)
+    fn size(&self) -> Vector2<i32> {
+        (self.width, self.height).into()
     }
 
     fn default(&self) -> Self::CellType {
         Cell::Blank
     }
 
-    fn get(&self, index: Coord) -> Option<&Self::CellType> {
+    fn get(&self, index: impl Into<Vector2<i32>>) -> Option<&Self::CellType> {
+        let index = index.into();
         if self.contains(index) {
-            Some(&self.cells[(index.0 + index.1 * self.width) as usize])
+            Some(&self.cells[(index.x + index.y * self.width) as usize])
         } else {
             None
         }
@@ -76,9 +78,10 @@ impl Grid for Board {
 }
 
 impl GridMut for Board {
-    fn get_mut(&mut self, index: Coord) -> Option<&mut Self::CellType> {
+    fn get_mut(&mut self, index: impl Into<Vector2<i32>>) -> Option<&mut Self::CellType> {
+        let index = index.into();
         if self.contains(index) {
-            Some(&mut self.cells[(index.0 + index.1 * self.width) as usize])
+            Some(&mut self.cells[(index.x + index.y * self.width) as usize])
         } else {
             None
         }

@@ -1,4 +1,5 @@
-use crate::coords::{Coord, xy};
+use crate::coords::Coord;
+use cgmath::Vector2;
 
 /// A trait for operations on a 2d grid of objects
 pub trait Grid {
@@ -6,7 +7,7 @@ pub trait Grid {
     type CellType;
 
     /// Return how large the grid is
-    fn size(&self) -> Coord;
+    fn size(&self) -> Vector2<i32>;
 
     /// The default value to use for unset cells in the grid (or if we look at
     /// a cell outside the grid)
@@ -14,17 +15,18 @@ pub trait Grid {
 
     /// Get a cell in the grid. This function must return `Some` for any point within
     /// the size of the grid, and `None` for any point outside the grid.
-    fn get(&self, index: Coord) -> Option<&Self::CellType>;
+    fn get(&self, index: impl Into<Vector2<i32>>) -> Option<&Self::CellType>;
 
     /// Is a given point inside the grid?
-    fn contains(&self, point: Coord) -> bool {
+    fn contains(&self, point: impl Into<Vector2<i32>>) -> bool {
+        let point = point.into();
         let dims = self.size();
-        !(point.0 < 0 || point.1 < 0 ||
-            point.1 >= dims.1 ||
-            point.0 >= dims.0)
+        !(point.x < 0 || point.y < 0 ||
+            point.y >= dims.y ||
+            point.x >= dims.x)
     }
 
-    /// Returns the `Coord` representing the nth cell in the grid, in reading order:
+    /// Returns the coord representing the nth cell in the grid, in reading order:
     /// left-to-right, top-to-bottom. This is useful because this is also the order that
     /// an `iter()` traverses the grid:
     /// ```
@@ -34,34 +36,35 @@ pub trait Grid {
     ///     let pt = grid.coord(n);
     /// }
     /// ```
-    fn coord(&self, n: usize) -> Coord {
-        let Coord(width, _) = self.size();
-        xy(n as i32 % width, n as i32 / width)
+    fn coord(&self, n: usize) -> Vector2<i32> {
+        let (width, _) = self.size().into();
+        (n as i32 % width, n as i32 / width).into()
     }
 
     /// The opposite of `coord`: returns `n` for a given coord in the grid, in reading order:
     /// left-to-right, top-to-bottom. If the govin coord is not in the grid, returns None
     /// ```
     /// # use grid::*;
-    /// let grid = VecGrid::new(xy(5, 5), 0);
-    /// let n = grid.nth(xy(3, 2));
+    /// let grid = VecGrid::new((5, 5).into(), 0);
+    /// let n = grid.nth((3, 2));
     /// ```
-    fn nth(&self, point: Coord) -> Option<usize> {
+    fn nth(&self, point: impl Into<Vector2<i32>>) -> Option<usize> {
+        let point = point.into();
         if self.contains(point) {
-            Some((point.0 + point.1 * self.size().0) as usize)
+            Some((point.x + point.y * self.size().x) as usize)
         } else {
             None
         }
     }
 
     fn iter(&self) -> impl Iterator<Item=&Self::CellType> {
-        let num_cells = (self.size().1 * self.size().0) as usize;
+        let num_cells = (self.size().x * self.size().y) as usize;
         (0..num_cells).map(|n| self.get(self.coord(n)).unwrap())
     }
 
-    fn map<A, F: Fn(Coord, &Self::CellType) -> A>(&self, func: F) -> Vec<A> {
-        let mut grid = Vec::with_capacity((self.size().0 * self.size().1) as usize);
-        for pt in self.size() {
+    fn map<A, F: Fn(Vector2<i32>, &Self::CellType) -> A>(&self, func: F) -> Vec<A> {
+        let mut grid = Vec::with_capacity((self.size().x * self.size().y) as usize);
+        for pt in self.size().iter() {
             grid.push(func(pt, self.get(pt).unwrap()))
         }
         grid
@@ -73,43 +76,48 @@ pub trait Grid {
     /// # use grid::*;
     /// let grid = VecGrid::from("+A\nAB");
     /// // Downcase all the neighbors:
-    /// let cs = grid.for_neighbors(xy(0, 0), |_c, ch| ch.to_lowercase().next().unwrap());
+    /// let cs = grid.for_neighbors((0, 0), |_c, ch| ch.to_lowercase().next().unwrap());
     /// ```
-    fn for_neighbors<T, F: Fn(Coord, &Self::CellType) -> T>(&self, point: Coord, func: F) -> (T, T, T, T) {
+    fn for_neighbors<T, F: Fn(Vector2<i32>, &Self::CellType) -> T>(&self, point: impl Into<Vector2<i32>>, func: F) -> (T, T, T, T) {
+        let point = point.into();
         let def = self.default();
-        let Coord(x, y) = point;
-        let n = func(xy(x, y-1), self.get(xy(x, y-1)).unwrap_or(&def));
-        let s = func(xy(x, y+1), self.get(xy(x, y+1)).unwrap_or(&def));
-        let e = func(xy(x+1, y), self.get(xy(x+1, y)).unwrap_or(&def));
-        let w = func(xy(x-1, y), self.get(xy(x-1, y)).unwrap_or(&def));
+        let (x, y) = point.into();
+        let n = func((x, y-1).into(), self.get((x, y-1)).unwrap_or(&def));
+        let s = func((x, y+1).into(), self.get((x, y+1)).unwrap_or(&def));
+        let e = func((x+1, y).into(), self.get((x+1, y)).unwrap_or(&def));
+        let w = func((x-1, y).into(), self.get((x-1, y)).unwrap_or(&def));
         (n, s, e, w)
     }
 
     /// Just like `for_neighbors` except it returns `(ne, se, sw, nw)`
-    fn for_diagonals<T, F: Fn(Coord, &Self::CellType) -> T>(&self, point: Coord, func: F) -> (T, T, T, T) {
+    fn for_diagonals<T, F: Fn(Vector2<i32>, &Self::CellType) -> T>(&self, point: impl Into<Vector2<i32>>, func: F) -> (T, T, T, T) {
+        let point = point.into();
         let def = self.default();
-        let Coord(x, y) = point;
-        let ne = func(xy(x+1, y-1), self.get(xy(x+1, y-1)).unwrap_or(&def));
-        let se = func(xy(x+1, y+1), self.get(xy(x+1, y+1)).unwrap_or(&def));
-        let sw = func(xy(x-1, y+1), self.get(xy(x-1, y+1)).unwrap_or(&def));
-        let nw = func(xy(x-1, y-1), self.get(xy(x-1, y-1)).unwrap_or(&def));
+        let (x, y) = point.into();
+        let ne = func((x+1, y-1).into(), self.get((x+1, y-1)).unwrap_or(&def));
+        let se = func((x+1, y+1).into(), self.get((x+1, y+1)).unwrap_or(&def));
+        let sw = func((x-1, y+1).into(), self.get((x-1, y+1)).unwrap_or(&def));
+        let nw = func((x-1, y-1).into(), self.get((x-1, y-1)).unwrap_or(&def));
         (ne, se, sw, nw)
     }
 
     /// The coordinates of our orthogonal neighbors, but only the ones actually in the grid
-    fn neighbor_coords(&self, point: Coord) -> impl Iterator<Item=Coord> {
+    fn neighbor_coords(&self, point: impl Into<Vector2<i32>>) -> impl Iterator<Item=Vector2<i32>> {
+        let point = point.into();
         let c = vec![point.north(), point.east(), point.south(), point.west()];
         c.into_iter().filter(|pt| self.contains(*pt))
     }
 
     /// The coordinates of our diagonal neighbors, but only the ones actually in the grid
-    fn diagonal_coords(&self, point: Coord) -> impl Iterator<Item=Coord> {
+    fn diagonal_coords(&self, point: impl Into<Vector2<i32>>) -> impl Iterator<Item=Vector2<i32>> {
+        let point = point.into();
         let c = vec![point.northeast(), point.southeast(), point.southwest(), point.northwest()];
         c.into_iter().filter(|pt| self.contains(*pt))
     }
 
     /// The coordinates of our orthogonal and diagonal neighbors, but only the ones actually in the grid
-    fn adjacent_coords(&self, point: Coord) -> impl Iterator<Item=Coord> {
+    fn adjacent_coords(&self, point: impl Into<Vector2<i32>>) -> impl Iterator<Item=Vector2<i32>> {
+        let point = point.into();
         let c = vec![
             point.north(),
             point.northeast(),
@@ -124,29 +132,29 @@ pub trait Grid {
     }
 
     /// Convenience method for `for_neighbors` just comparing with ==
-    fn neighbors_equal(&self, point: Coord, val: Self::CellType) -> (bool, bool, bool, bool)
+    fn neighbors_equal(&self, point: impl Into<Vector2<i32>>, val: Self::CellType) -> (bool, bool, bool, bool)
         where Self::CellType: PartialEq {
         self.for_neighbors(point, |_, cell| *cell == val)
     }
 
     /// Convenience method for `for_diagonals` just comparing with ==
-    fn diagonals_equal(&self, point: Coord, val: Self::CellType) -> (bool, bool, bool, bool)
+    fn diagonals_equal(&self, point: impl Into<Vector2<i32>>, val: Self::CellType) -> (bool, bool, bool, bool)
         where Self::CellType: PartialEq {
         self.for_diagonals(point, |_, cell| *cell == val)
     }
 
     /// Returns a coord (arbitrary, but in practice the top-left) of a cell that fits the
     /// given filter
-    fn find<F: Fn(&Self::CellType) -> bool>(&self, test: F) -> Option<Coord> {
-        for c in self.size() {
+    fn find<F: Fn(&Self::CellType) -> bool>(&self, test: F) -> Option<Vector2<i32>> {
+        for c in self.size().iter() {
             if test(self.get(c).unwrap()) { return Some(c) }
         }
         None
     }
 
     /// Return an iterator of all the coords that match a certain predicate
-    fn find_all<'a, F: Fn(&Self::CellType) -> bool + 'a>(&'a self, test: F) -> impl Iterator<Item=Coord> {
-        self.size().into_iter().filter(move |c| test(self.get(*c).unwrap()))
+    fn find_all<'a, F: Fn(&Self::CellType) -> bool + 'a>(&'a self, test: F) -> impl Iterator<Item=Vector2<i32>> {
+        self.size().iter().filter(move |c| test(self.get(*c).unwrap()))
     }
 }
 
@@ -154,7 +162,7 @@ pub trait Grid {
 pub trait GridMut: Grid {
     /// This behaves just like `get`: it must return `Some` for any coord in the bounds of the
     /// grid and `None` outside.
-    fn get_mut(&mut self, index: Coord) -> Option<&mut Self::CellType>;
+    fn get_mut(&mut self, index: impl Into<Vector2<i32>>) -> Option<&mut Self::CellType>;
 }
 
 /// Trait impld on `(bool, bool, bool, bool)` to make it easy to count
@@ -183,12 +191,13 @@ mod tests {
     struct TestGrid(Vec<char>, i32);
     impl Grid for TestGrid {
         type CellType = char;
-        fn size(&self) -> Coord { xy(self.1, self.0.len() as i32 / self.1) }
+        fn size(&self) -> Vector2<i32> { (self.1, self.0.len() as i32 / self.1).into() }
         fn default(&self) -> Self::CellType { ' ' }
 
-        fn get(&self, index: Coord) -> Option<&char> {
+        fn get(&self, index: impl Into<Vector2<i32>>) -> Option<&char> {
+            let index = index.into();
             if self.contains(index) {
-                Some(&self.0[index.0 as usize + (index.1 * self.1) as usize])
+                Some(&self.0[index.x as usize + (index.y * self.1) as usize])
             } else {
                 None
             }
@@ -221,9 +230,9 @@ mod tests {
         // AAA
         let grid = TestGrid::from("ABA\nBBA\nAAA");
         // The one in the center:
-        assert_eq!(grid.neighbors_equal(xy(1, 1), 'B'), (true, false, false, true));
+        assert_eq!(grid.neighbors_equal((1, 1), 'B'), (true, false, false, true));
 
         // One near the edge:
-        assert_eq!(grid.neighbors_equal(xy(1, 0), 'B'), (false, true, false, false))
+        assert_eq!(grid.neighbors_equal((1, 0), 'B'), (false, true, false, false))
     }
 }

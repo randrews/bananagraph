@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use bananagraph::{DrawingContext, Sprite};
-use grid::{xy, Coord, Grid};
+use grid::Grid;
 
 type PixelDimension = Vector2<u32>;
 
@@ -108,7 +108,7 @@ impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
     }
 
     /// Return the pixel coordinates of the top left corner of a given cell's location
-    pub fn cell_location(&self, coord: impl Into<Coord>) -> PixelDimension {
+    pub fn cell_location(&self, coord: impl Into<Vector2<i32>>) -> PixelDimension {
         let coord = coord.into();
 
         // See the diagram in #dimensions. We start at the start point and:
@@ -120,8 +120,8 @@ impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
         let (grid_width, grid_height) = self.grid.size().into();
         let start_x = self.base_size.x / 2 * (grid_height as u32 - 1);
 
-        let x = (coord.0 - coord.1) * self.base_size.x as i32 / 2 + start_x as i32;
-        let y = (coord.0 + coord.1) as u32 * self.base_size.y / 2;
+        let x = (coord.x - coord.y) * self.base_size.x as i32 / 2 + start_x as i32;
+        let y = (coord.x + coord.y) as u32 * self.base_size.y / 2;
 
         (x as u32, y).into()
     }
@@ -140,9 +140,9 @@ impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
     ///  \ / \ / \ / \ /
     ///   V   V   V   V
     /// ```
-    pub fn cell_row(&self, coord: impl Into<Coord>) -> u32 {
+    pub fn cell_row(&self, coord: impl Into<Vector2<i32>>) -> u32 {
         let coord = coord.into();
-        (coord.0 + coord.1) as u32
+        (coord.x + coord.y) as u32
     }
 
     /// Return a z coordinate between 0.0 and 1.0 that will stack these tiles prettily.
@@ -152,8 +152,8 @@ impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
     /// Because this is all orthographic projection, we don't really give a damn what the z coordinate
     /// _is,_ as long as they sort correctly; we're only using it for occultation, not perspective.
     /// TODO: this needs to work for non-10x10 grids
-    pub fn z_coord(&self, coord: Coord) -> f32 {
-        let (x, y) = coord.into();
+    pub fn z_coord(&self, coord: impl Into<Vector2<i32>>) -> f32 {
+        let (x, y) = coord.into().into();
 
         // The rank of something is its x + y, because isometric view; the lower right of the board
         // is closest to the "camera". Higher z means it's farther away, so we can just divide something
@@ -180,20 +180,20 @@ impl<'a, T: AsSprite, G: Grid<CellType=T>> IsoMap<'a, T, G> {
         sprites
     }
 
-    pub fn sprite(&self, sprite: Sprite, coord: Coord, dc: &DrawingContext) -> Sprite {
+    pub fn sprite(&self, sprite: Sprite, coord: impl Into<Vector2<i32>>, dc: &DrawingContext) -> Sprite {
         let translation = self.cell_location(coord);
         dc.place(sprite, (translation.x as f32, translation.y as f32))
     }
 
-    pub fn id_for(&self, coord: Coord) -> u32 {
-        let (x, y) = coord.into();
-        (x + y * self.grid.size().0 + 100000) as u32
+    pub fn id_for(&self, coord: impl Into<Vector2<i32>>) -> u32 {
+        let (x, y) = coord.into().into();
+        (x + y * self.grid.size().x + 100000) as u32
     }
 
-    pub fn coord_for(&self, id: u32) -> Option<Coord> {
+    pub fn coord_for(&self, id: u32) -> Option<Vector2<i32>> {
         if id > 100000 {
-            let width = self.grid.size().0;
-            Some(xy((id - 100000) as i32 % width, (id - 100000) as i32 / width))
+            let width = self.grid.size().x;
+            Some(((id - 100000) as i32 % width, (id - 100000) as i32 / width).into())
         } else {
             None
         }

@@ -902,6 +902,7 @@ dependencies = [
 name = "grid"
 version = "0.1.0"
 dependencies = [
+ "cgmath",
  "line_drawing",
  "rand 0.8.5",
 ]

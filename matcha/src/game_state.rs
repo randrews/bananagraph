@@ -4,7 +4,7 @@ use cgmath::{Point2, Vector2};
 use hecs::{Entity, World};
 use rand::Rng;
 use bananagraph::{DrawingContext, Sprite, SpriteId};
-use grid::{xy, Grid, VecGrid};
+use grid::{Coord, Grid, VecGrid};
 use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
 use crate::game_state::CaptureSteps::{FadeAnimation, FallAnimation, PieceSelection, SwapAnimation};
 use crate::matcha_board::MatchaBoard;
@@ -41,7 +41,7 @@ impl<'a, R: Rng> GameState<'a, R> {
 
         for (n, color) in board.iter().enumerate() {
             let c = board.coord(n);
-            world.spawn((Piece::new(*color, (c.0, c.1)),));
+            world.spawn((Piece::new(*color, c),));
         }
 
         Self {
@@ -100,7 +100,7 @@ impl<'a, R: Rng> GameState<'a, R> {
         let entity_board = self.entity_grid_from_world();
 
         for pt in captured.into_iter() {
-            let c = xy(pt.x, pt.y);
+            let c = Vector2::from((pt.x, pt.y));
             self.world.insert_one(entity_board[c], Fade::new()).unwrap()
         }
     }
@@ -112,19 +112,19 @@ impl<'a, R: Rng> GameState<'a, R> {
 
         // First, clear out everything that was captured:
         for pt in captured.into_iter() {
-            let c = xy(pt.x, pt.y);
+            let c = Vector2::from((pt.x, pt.y));
             board[c] = Empty;
             self.world.despawn(entity_grid[c]).unwrap()
         }
 
         // Make a grid with how far each piece needs to fall:
         let mut falls = VecGrid::new(Grid::size(&board), 0);
-        let height = falls.size().1;
-        for c in falls.size() {
+        let height = falls.size().y;
+        for c in falls.size().iter() {
             if board[c] == Empty { continue } // don't bother counting the empties
             let mut n = 0;
-            for y in c.1 .. height {
-                if board[xy(c.0, y)] == Empty { n += 1 }
+            for y in c.y .. height {
+                if board[(c.x, y)] == Empty { n += 1 }
             }
 
             falls[c] = n;
@@ -132,9 +132,9 @@ impl<'a, R: Rng> GameState<'a, R> {
 
         // Now, apply move animations:
         // We'll go ahead and logically move the pieces now, and have them "fall" from an artificially higher place
-        for c in falls.size() {
+        for c in falls.size().iter() {
             if falls[c] != 0 {
-                let anim = MoveAnimation::new(xy(0, -falls[c] * 85));
+                let anim = MoveAnimation::new((0, -falls[c] * 85));
                 self.world.insert_one(entity_grid[c], anim).unwrap();
                 let piece = self.world.query_one_mut::<&mut Piece>(entity_grid[c]).unwrap();
                 piece.position.y += falls[c];
@@ -145,18 +145,18 @@ impl<'a, R: Rng> GameState<'a, R> {
         // tops of columns:
         let entity_grid = self.entity_grid_from_world();
         // A vec of the number of empty cells at the top of each column
-        let empty_heights: Vec<_> = (0..entity_grid.size().0).map(|x| {
+        let empty_heights: Vec<_> = (0..entity_grid.size().x).map(|x| {
             let mut n = 0;
             for y in 0..height {
-                if entity_grid[xy(x, y)] == Entity::DANGLING { n += 1 }
+                if entity_grid[(x, y)] == Entity::DANGLING { n += 1 }
             }
             n
         }).collect();
-        for c in entity_grid.size() {
+        for c in entity_grid.size().iter() {
             if entity_grid[c] == Entity::DANGLING {
                 // We need to create a new thing here!
-                let new_piece = Piece::new(PieceColor::from_rand(self.rng), (c.0, c.1));
-                let anim = MoveAnimation::new(xy(0, -empty_heights[c.0 as usize] * 85));
+                let new_piece = Piece::new(PieceColor::from_rand(self.rng), c);
+                let anim = MoveAnimation::new((0, -empty_heights[c.x as usize] * 85));
                 self.world.spawn((new_piece, anim));
             }
         }
@@ -178,7 +178,7 @@ impl<'a, R: Rng> GameState<'a, R> {
 
         captured.into_iter().map(|n| {
             let c = board.coord(n);
-            (c.0, c.1).into()
+            (c.x, c.y).into()
         }).collect()
     }
 
@@ -247,17 +247,17 @@ impl<'a, R: Rng> GameState<'a, R> {
     }
 
     fn board_from_world(&self) -> VecGrid<PieceColor> {
-        let mut board = VecGrid::new(xy(8, 8), Empty);
+        let mut board = VecGrid::new((8, 8), Empty);
         for (_ent, piece) in self.world.query::<&Piece>().into_iter() {
-            board[xy(piece.position.x, piece.position.y)] = piece.color;
+            board[piece.position] = piece.color;
         }
         board
     }
 
     fn entity_grid_from_world(&self) -> VecGrid<Entity> {
-        let mut grid = VecGrid::new(xy(8, 8), Entity::DANGLING);
+        let mut grid = VecGrid::new((8, 8), Entity::DANGLING);
         for (ent, piece) in self.world.query::<&Piece>().into_iter() {
-            grid[xy(piece.position.x, piece.position.y)] = ent;
+            grid[piece.position] = ent;
         }
         grid
     }
@@ -265,7 +265,7 @@ impl<'a, R: Rng> GameState<'a, R> {
     fn valid_move(&self, p1: impl Into<Vector2<i32>>, p2: impl Into<Vector2<i32>>) -> bool {
         let (p1, p2) = (p1.into(), p2.into());
         let board = self.board_from_world();
-        board.valid_move(xy(p1.x, p1.y), xy(p2.x, p2.y))
+        board.valid_move((p1.x, p1.y), (p2.x, p2.y))
     }
 
     pub fn animation_blocked(&self) -> bool {
@@ -275,11 +275,11 @@ impl<'a, R: Rng> GameState<'a, R> {
 }
 
 fn initialize_board<R: Rng + Sized>(rng: &mut R) -> VecGrid<PieceColor> {
-    let mut board = VecGrid::new((8, 8).into(), Empty);
+    let mut board = VecGrid::new((8, 8), Empty);
     loop {
         // board is a temporary vecgrid of just piece colors, until we can create a valid
         // field, then we'll reify it into entities
-        for coord in Grid::size(&board) {
+        for coord in Grid::size(&board).iter() {
             board[coord] = PieceColor::from_rand(rng)
         }
 

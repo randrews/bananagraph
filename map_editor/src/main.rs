@@ -87,10 +87,10 @@ pub async fn run_window() -> Result<(), EventLoopError> {
 
 fn toggle_wall(id: u32, board: &mut Board) {
     if id >= 100000 {
-        let coord = sprite_id_to_coord(id, board.size().0);
-        let cell = board.get(coord.into()).unwrap();
+        let coord = sprite_id_to_coord(id, board.size().x);
+        let cell = board.get(coord).unwrap();
 
-        *board.get_mut(coord.into()).unwrap() = match cell {
+        *board.get_mut(coord).unwrap() = match cell {
             Cell::Black | Cell::White => {
                 Cell::TallWall
             },
@@ -115,7 +115,7 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
         let id = buffer[mouse_pos.into()];
         if id >= 100000 {
-            let board_coord = sprite_id_to_coord(id, board.size().0);
+            let board_coord = sprite_id_to_coord(id, board.size().x);
             sprites = shorten_walls(board, board_coord, sprites);
             buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
         }
@@ -124,12 +124,12 @@ fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
     if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
         let id = buffer[mouse_pos.into()];
         if id >= 100000 {
-            let board_coord = sprite_id_to_coord(id, board.size().0);
-            if let Some(Cell::White | Cell::Black) = board.get(board_coord.into()) {
+            let board_coord = sprite_id_to_coord(id, board.size().x);
+            if let Some(Cell::White | Cell::Black) = board.get(board_coord) {
                 let highlight = highlight_sprites();
-                let z = iso_map.z_coord(board_coord.into());
-                sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord.into(), &dc));
-                sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord.into(), &dc));
+                let z = iso_map.z_coord(board_coord);
+                sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord, &dc));
+                sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord, &dc));
             }
         }
     }
@@ -187,14 +187,14 @@ fn create_drawing_contexts(dims: Vector2<f32>, base_dc: DrawingContext) -> Drawi
 }
 
 fn shorten_walls(board: &Board, mouse_coord: (i32, i32), sprites: Vec<Sprite>) -> Vec<Sprite> {
-    let width = board.size().0;
+    let width = board.size().x;
     sprites.iter().map(|sprite| {
         if sprite.id >= 100000 {
-            let coord: Coord = sprite_id_to_coord(sprite.id, width).into();
+            let coord: Vector2<i32> = sprite_id_to_coord(sprite.id, width).into();
             if matches!(board.get(coord), Some(Cell::TallWall)) &&
                 (coord == mouse_coord.into() || coord.adjacent(mouse_coord.into())) &&
-                coord.0 > 0 &&
-                coord.1 > 0 {
+                coord.x > 0 &&
+                coord.y > 0 {
                 // The trick here is that the transform is the same. So we just make a new sprite
                 // with the same transform, id, and z:
                 return Cell::ShortWall.as_sprite().with_transform(sprite.transform).with_id(sprite.id).with_z(sprite.z)

@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 use std::ops::Range;
+use cgmath::Vector2;
 use line_drawing::WalkGrid;
 use rand::prelude::{StdRng};
 use rand::Rng;
-use crate::{Coord, Grid, VecGrid, CountableNeighbors, xy};
+use crate::{Coord, Grid, VecGrid, CountableNeighbors};
 
 pub struct CellularMap {
-    size: Coord,
+    size: Vector2<i32>,
     probability: f32,
     born: Range<i32>,
     survive: Range<i32>,
@@ -15,9 +16,9 @@ pub struct CellularMap {
 }
 
 impl CellularMap {
-    pub fn new(size: Coord) -> Self {
+    pub fn new(size: impl Into<Vector2<i32>>) -> Self {
         Self {
-            size,
+            size: size.into(),
             probability: 0.5,
             born: 5..9,
             survive: 4..9,
@@ -60,13 +61,13 @@ impl CellularMap {
     pub fn build(self, rand: &mut StdRng) -> VecGrid<bool> {
         let mut grid = VecGrid::new(self.size, true);
 
-        for pt in grid.size() {
+        for pt in grid.size().iter() {
             grid[pt] = rand.gen_ratio((self.probability * 1000.0) as u32, 1000u32);
         }
 
         for _ in 0..self.generations {
             let old = grid.clone();
-            for pt in old.size() {
+            for pt in old.size().iter() {
                 let nbrs = (old.neighbors_equal(pt, true).count() +
                     old.diagonals_equal(pt, true).count()) as i32;
                 if !old[pt] && self.born.contains(&nbrs) {
@@ -83,10 +84,11 @@ impl CellularMap {
     }
 }
 
-fn bft<T, F: Fn(&T) -> bool>(grid: &impl Grid<CellType=T>, start: Coord, traversable: F) -> Vec<Coord> {
+fn bft<T, F: Fn(&T) -> bool>(grid: &impl Grid<CellType=T>, start: impl Into<Vector2<i32>>, traversable: F) -> Vec<Vector2<i32>> {
+    let start = start.into();
     let mut open = vec![start];
-    let mut visited: Vec<Coord> = vec![];
-    let mut closed: HashSet<Coord> = HashSet::new();
+    let mut visited: Vec<Vector2<i32>> = vec![];
+    let mut closed: HashSet<Vector2<i32>> = HashSet::new();
 
     while !open.is_empty() {
         let curr = open.remove(0);
@@ -105,7 +107,7 @@ fn bft<T, F: Fn(&T) -> bool>(grid: &impl Grid<CellType=T>, start: Coord, travers
     visited
 }
 
-fn closest_between(group1: &Vec<Coord>, group2: &Vec<Coord>) -> (Coord, Coord, i32) {
+fn closest_between(group1: &Vec<Vector2<i32>>, group2: &Vec<Vector2<i32>>) -> (Vector2<i32>, Vector2<i32>, i32) {
     let mut min = (group1[0], group2[0], group1[0].manhattan_dist_to(group2[0]));
 
     for pt_a in group1 {
@@ -120,8 +122,8 @@ fn closest_between(group1: &Vec<Coord>, group2: &Vec<Coord>) -> (Coord, Coord, i
     min
 }
 
-fn shortest_tunnel(groups: &Vec<Vec<Coord>>) -> (usize, Coord, usize, Coord) {
-    let mut pts = (xy(0, 0), xy(0, 0));
+fn shortest_tunnel(groups: &Vec<Vec<Vector2<i32>>>) -> (usize, Vector2<i32>, usize, Vector2<i32>) {
+    let mut pts = (Vector2::from((0, 0)), Vector2::from((0, 0)));
     let mut group_nums = (0, 0);
     let mut min_dist = i32::MAX;
 
@@ -146,12 +148,12 @@ fn connect_groups(grid: VecGrid<bool>) -> VecGrid<bool> {
     let mut group_num_grid: VecGrid<i32> = VecGrid::new(grid.size(), 0);
 
     // First, replace all the empty spaces with -1, signifying unassigned:
-    for c in group_num_grid.size() {
+    for c in group_num_grid.size().iter() {
         if !grid[c] { group_num_grid[c] = -1 }
     }
 
     let mut group_num = 1;
-    let mut groups: Vec<Vec<Coord>> = vec![];
+    let mut groups: Vec<Vec<Vector2<i32>>> = vec![];
 
     loop {
         // First, find some unassigned cell:
@@ -177,13 +179,13 @@ fn connect_groups(grid: VecGrid<bool>) -> VecGrid<bool> {
 
         // Draw that tunnel with bresenham
         for lp in WalkGrid::new(pt_a.into(), pt_b.into()) {
-            let lp: Coord = lp.into();
+            let lp: Vector2<i32> = lp.into();
             group_num_grid[lp] = tgt;
             groups[idx_a].push(lp);
         }
 
         // Change the cells in the group we just joined
-        for pt in group_num_grid.size() {
+        for pt in group_num_grid.size().iter() {
             if group_num_grid[pt] == old { group_num_grid[pt] = tgt }
         }
 
@@ -195,22 +197,21 @@ fn connect_groups(grid: VecGrid<bool>) -> VecGrid<bool> {
 
     // Convert this back to a VecGrid<bool> for return
     let mut new_grid = VecGrid::new(grid.size(), false);
-    for c in group_num_grid.size() { new_grid[c] = group_num_grid[c] == 0 }
+    for c in group_num_grid.size().iter() { new_grid[c] = group_num_grid[c] == 0 }
     new_grid
 }
 
 #[cfg(test)]
 mod test {
-    use crate::xy;
     use super::*;
 
     #[test]
     fn test_bft() {
         let grid = VecGrid::from("....\n.++.\n.+..");
-        let cs = bft(&grid, xy(1, 1), |ch| *ch == '+');
-        assert!(cs.contains(&xy(1, 1)));
-        assert!(cs.contains(&xy(2, 1)));
-        assert!(cs.contains(&xy(1, 2)));
+        let cs = bft(&grid, (1, 1), |ch| *ch == '+');
+        assert!(cs.contains(&Vector2::from((1, 1))));
+        assert!(cs.contains(&Vector2::from((2, 1))));
+        assert!(cs.contains(&Vector2::from((1, 2))));
         assert_eq!(cs.len(), 3);
     }
 }

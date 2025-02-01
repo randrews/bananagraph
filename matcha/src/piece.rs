@@ -1,7 +1,6 @@
 use cgmath::Vector2;
 use rand::Rng;
 use bananagraph::Sprite;
-use grid::xy;
 use crate::animation::MoveAnimation;
 use crate::drawable::Drawable;
 
@@ -75,8 +74,8 @@ impl Piece {
     pub fn swap_animations(piece1: Piece, piece2: Piece) -> (MoveAnimation, MoveAnimation) {
         let d = piece2.position - piece1.position;
         (
-            MoveAnimation::new(xy(85 * d.x, 85 * d.y)),
-            MoveAnimation::new(xy(-85 * d.x, -85 * d.y))
+            MoveAnimation::new((85 * d.x, 85 * d.y)),
+            MoveAnimation::new((-85 * d.x, -85 * d.y))
         )
     }
 }
