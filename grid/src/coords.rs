@@ -1,4 +1,4 @@
-use cgmath::Vector2;
+use cgmath::{Point2, Vector2};
 
 /// The four cardinal directions
 #[derive(Copy, Clone, PartialEq)]
@@ -106,6 +106,7 @@ impl Iterator for CoordIterator where {
 }
 
 impl Coord for Vector2<i32> {}
+impl Coord for Point2<i32> {}
 
 #[cfg(test)]
 mod test {

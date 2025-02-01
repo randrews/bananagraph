@@ -45,7 +45,7 @@ pub trait Grid {
     /// left-to-right, top-to-bottom. If the govin coord is not in the grid, returns None
     /// ```
     /// # use grid::*;
-    /// let grid = VecGrid::new((5, 5).into(), 0);
+    /// let grid = VecGrid::new((5, 5), 0);
     /// let n = grid.nth((3, 2));
     /// ```
     fn nth(&self, point: impl Into<Vector2<i32>>) -> Option<usize> {
