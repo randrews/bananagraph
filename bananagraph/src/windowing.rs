@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use cgmath::{Point2, Vector2};
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
-use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
+use winit::event::{ElementState, Event, KeyEvent, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::ControlFlow;
 use crate::{GpuWrapper, IdBuffer, Sprite, SpriteId};
 
@@ -21,6 +21,7 @@ pub trait WindowEventHandler {
     fn tick(&mut self, dt: Duration);
     fn exit(&mut self) -> bool;
     fn click(&mut self, event: Click);
+    fn key(&mut self, event: KeyEvent, is_synthetic: bool);
 }
 
 pub async fn run_window(title: &str, size: Vector2<u32>, min_size: Vector2<u32>, handler: &mut impl WindowEventHandler) -> Result<(), EventLoopError> {
@@ -90,6 +91,12 @@ pub async fn run_window(title: &str, size: Vector2<u32>, min_size: Vector2<u32>,
                     entity,
                     mouse_pos,
                 });
+            }
+
+            Event::WindowEvent {
+                window_id, event: WindowEvent::KeyboardInput { device_id: _, event, is_synthetic }
+            } if window_id == our_id => {
+                handler.key(event, is_synthetic);
             }
 
             _ => {} // toss the others

@@ -1923,7 +1923,9 @@ dependencies = [
  "bananagraph",
  "cgmath",
  "grid",
+ "hecs",
  "pollster",
+ "winit",
 ]
 
 [[package]]
