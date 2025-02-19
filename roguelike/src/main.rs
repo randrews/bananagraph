@@ -5,10 +5,8 @@ mod animation;
 use std::time::Duration;
 use cgmath::Vector2;
 use hecs::World;
-use winit::event::{ElementState, KeyEvent};
-use winit::keyboard::{Key, NamedKey};
 use animation::BreatheAnimation;
-use bananagraph::{Click, GpuWrapper, Sprite, WindowEventHandler};
+use bananagraph::{GpuWrapper, Sprite, WindowEventHandler};
 use grid::{Coord, Dir, VecGrid};
 use crate::components::{OnMap, Player};
 use crate::terrain::recreate_terrain;
@@ -17,13 +15,13 @@ pub struct GameState {
     world: World
 }
 
-impl GameState {
-    pub fn new() -> Self {
-        Self {
-            world: World::new()
-        }
+impl Default for GameState {
+    fn default() -> Self {
+        Self { world: World::new() }
     }
+}
 
+impl GameState {
     pub fn set_map(&mut self, map: VecGrid<char>) {
         recreate_terrain(map, &mut self.world)
     }
@@ -73,29 +71,26 @@ impl WindowEventHandler for GameState {
         BreatheAnimation::system(&mut self.world, dt)
     }
 
-    fn exit(&mut self) -> bool {
-        true
+    fn arrow_key(&mut self, dir: bananagraph::Dir) {
+        self.walk(convert_dir(dir))
     }
 
-    fn click(&mut self, _event: Click) {
+    fn letter_key(&mut self, s: &str) {
+        println!("typed: [{}]", s)
     }
+}
 
-    fn key(&mut self, event: KeyEvent, is_synthetic: bool) {
-        // We can ignore release events...
-        if event.state == ElementState::Released { return }
-
-        match event.logical_key {
-            Key::Named(NamedKey::ArrowDown) => self.walk(Dir::South),
-            Key::Named(NamedKey::ArrowUp) => self.walk(Dir::North),
-            Key::Named(NamedKey::ArrowLeft) => self.walk(Dir::West),
-            Key::Named(NamedKey::ArrowRight) => self.walk(Dir::East),
-            _ => {}
-        }
+fn convert_dir(bdir: bananagraph::Dir) -> grid::Dir {
+    match bdir {
+        bananagraph::Dir::North => Dir::North,
+        bananagraph::Dir::South => Dir::South,
+        bananagraph::Dir::East => Dir::East,
+        bananagraph::Dir::West => Dir::West,
     }
 }
 
 fn main() {
-    let map: VecGrid<char> = VecGrid::from(vec![
+    let map: VecGrid<char> = VecGrid::from([
         "..........",
         "..######..",
         "..#....#..",
@@ -108,7 +103,7 @@ fn main() {
         "..........",
     ].join("\n").as_str());
 
-    let mut game_state = GameState::new();
+    let mut game_state = GameState::default();
     game_state.set_map(map);
     game_state.set_player((4, 2));
 

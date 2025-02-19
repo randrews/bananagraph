@@ -10,4 +10,4 @@ pub use gpu_wrapper::GpuWrapper;
 pub use id_buffer::IdBuffer;
 pub use sprite::{Sprite, SpriteId};
 pub use drawing_context::DrawingContext;
-pub use windowing::{Click, WindowEventHandler, run_window};
+pub use windowing::{Click, WindowEventHandler, run_window, Dir};
