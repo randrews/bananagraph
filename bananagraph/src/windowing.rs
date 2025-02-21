@@ -1,11 +1,13 @@
 use std::ops::Index;
 use std::time::{Duration, Instant};
 use cgmath::{Point2, Vector2};
+use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
 use winit::event::{ElementState, Event, KeyEvent, MouseButton, StartCause, WindowEvent};
-use winit::event_loop::ControlFlow;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
+use winit::window::{Window, WindowAttributes, WindowId};
 use crate::{GpuWrapper, IdBuffer, Sprite, SpriteId};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -76,82 +78,101 @@ pub trait WindowEventHandler {
     fn letter_key(&mut self, _s: &str) {}
 }
 
-pub async fn run_window(title: &str, size: Vector2<u32>, min_size: Vector2<u32>, handler: &mut impl WindowEventHandler) -> Result<(), EventLoopError> {
-    let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
+struct App<H> {
+    window: Option<&'static Window>,
+    wrapper: Option<GpuWrapper<'static>>,
+    initial_size: Vector2<u32>,
+    handler: H,
+    attrs: WindowAttributes,
+    timer_length: Duration,
+    mouse_pos: Point2<f64>,
+    id_buffer: Option<IdBuffer>
+}
 
-    let window = winit::window::WindowBuilder::new()
-        .with_title(title)
-        .with_inner_size(LogicalSize { width: size.x, height: size.y })
-        .with_min_inner_size(LogicalSize { width: min_size.x, height: min_size.y })
-        .build(&event_loop)?;
+impl<H: WindowEventHandler> ApplicationHandler for App<H> {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window = event_loop.create_window(self.attrs.clone()).unwrap();
+        let window = Box::leak(Box::new(window));
+        self.window = Some(window);
 
-    let mut wrapper = GpuWrapper::new(&window, size.into()).await;
-    handler.init(&mut wrapper);
-    let our_id = window.id();
-    let mut id_buffer: Option<IdBuffer> = None;
+        let mut wrapper = pollster::block_on(GpuWrapper::new(window, self.initial_size.into()));
+        self.handler.init(&mut wrapper);
+        self.wrapper = Some(wrapper);
+        event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length))
+    }
 
-    let timer_length = Duration::from_millis(20);
-
-    // The mouse position is a float, but seems to still describe positions within the same coord
-    // space as the window, so just floor()ing it gives you reasonable coordinates
-    let mut mouse_pos: Point2<f64> = (-1f64, -1f64).into();
-
-    event_loop.run(move |event, target| {
+    // When the timer fires, redraw thw window and restart the timer (update will go here)
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        if let StartCause::ResumeTimeReached { .. } = cause {
+            self.handler.tick(self.timer_length);
+            self.id_buffer = Some(self.wrapper.as_mut().unwrap().redraw_with_ids(self.handler.redraw()).expect("Drawing error"));
+            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length));
+        }
+    }
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, our_id: WindowId, event: WindowEvent) {
         match event {
             // Exit if we click the little x
-            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } if window_id == our_id => {
-                if handler.exit() {
-                    target.exit();
+            WindowEvent::CloseRequested => {
+                if self.handler.exit() {
+                    event_loop.exit()
                 }
-            }
+            },
 
             // Redraw if it's redrawing time
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => {
-                id_buffer = Some(wrapper.redraw_with_ids(handler.redraw()).expect("Drawing error"));
+            WindowEvent::RedrawRequested => {
+                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw()).expect("Drawing error"));
             },
 
             // Resize if it's resizing time
-            Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
-
-            // Start the timer on init
-            Event::NewEvents(StartCause::Init) => {
-                target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
-            }
-
-            // When the timer fires, redraw thw window and restart the timer (update will go here)
-            Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                handler.tick(timer_length);
-                id_buffer = Some(wrapper.redraw_with_ids(handler.redraw()).expect("Drawing error"));
-                target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
+            WindowEvent::Resized(new_size)  => {
+                self.wrapper.as_mut().unwrap().handle_resize(new_size)
             }
 
             // Update that the mouse moved if it did
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position: pos, device_id: _ },
-                window_id
-            } if window_id == our_id => {
-                mouse_pos = (pos.x, pos.y).into();
+            WindowEvent::CursorMoved { position: pos, device_id: _ } => {
+                self.mouse_pos = (pos.x, pos.y).into();
             }
 
-            Event::WindowEvent {
-                window_id, event: WindowEvent::MouseInput { device_id: _, state, button }
-            } if window_id == our_id => {
-                let entity = id_buffer.as_ref().map(|buf| *buf.index(mouse_pos));
-                handler.click(Click {
+            // Mouse clicked
+            WindowEvent::MouseInput { device_id: _, state, button } => {
+                let entity = self.id_buffer.as_ref().map(|buf| *buf.index(self.mouse_pos));
+                self.handler.click(Click {
                     button,
                     state,
                     entity,
-                    mouse_pos,
+                    mouse_pos: self.mouse_pos,
                 });
             }
 
-            Event::WindowEvent {
-                window_id, event: WindowEvent::KeyboardInput { device_id: _, event, is_synthetic }
-            } if window_id == our_id => {
-                handler.key(event, is_synthetic);
+            // Key pressed or released
+            WindowEvent::KeyboardInput { device_id: _, event, is_synthetic } => {
+                self.handler.key(event, is_synthetic);
             }
 
             _ => {} // toss the others
         }
-    })
+
+    }
+}
+
+pub async fn run_window(title: &str, initial_size: Vector2<u32>, min_size: Vector2<u32>, handler: impl WindowEventHandler) -> Result<(), EventLoopError> {
+    let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
+    event_loop.set_control_flow(ControlFlow::Wait);
+
+    let attrs = Window::default_attributes()
+        .with_title(title)
+        .with_inner_size(LogicalSize { width: initial_size.x, height: initial_size.y })
+        .with_min_inner_size(LogicalSize { width: min_size.x, height: min_size.y });
+
+    let mut app = App {
+        window: None,
+        wrapper: None,
+        id_buffer: None,
+        initial_size,
+        handler,
+        attrs,
+        mouse_pos: (-1f64, -1f64).into(),
+        timer_length: Duration::from_millis(20)
+    };
+    event_loop.run_app(&mut app)
 }
