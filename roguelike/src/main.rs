@@ -107,5 +107,5 @@ fn main() {
     game_state.set_map(map);
     game_state.set_player((4, 2));
 
-    let _ = pollster::block_on(bananagraph::run_window("Foo!", (1000, 800).into(), (250, 200).into(), &mut game_state));
+    let _ = pollster::block_on(bananagraph::run_window("Foo!", (1000, 800).into(), (250, 200).into(), game_state));
 }

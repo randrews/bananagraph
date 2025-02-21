@@ -3,8 +3,8 @@ use std::default::Default;
 use std::sync::Arc;
 use std::time::Duration;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Texture, TextureFormat, TextureUsages};
-use winit::dpi::PhysicalSize;
+use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, Texture, TextureFormat, TextureUsages};
+use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
@@ -23,8 +23,8 @@ pub struct GpuWrapper<'a> {
     id_pipeline: wgpu::RenderPipeline,
 
     // The window and surface of that window that we're rendering to
-    window: &'a Window,
-    surface: wgpu::Surface<'a>,
+    current_size: PhysicalSize<u32>,
+    surface: Surface<'a>,
 
     // The "logical" size of the window space, used for creating the
     // scale transform
@@ -54,6 +54,7 @@ pub struct GpuWrapper<'a> {
 
 impl<'a> GpuWrapper<'a> {
     pub async fn new(window: &'a Window, logical_size: (u32, u32)) -> Self {
+        let current_size = window.inner_size();
         let (surface, adapter, device, queue) = Self::create_device(window).await;
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
@@ -76,7 +77,7 @@ impl<'a> GpuWrapper<'a> {
             queue,
             render_pipeline,
             id_pipeline,
-            window,
+            current_size,
             surface,
             logical_size,
             vertex_buffer,
@@ -90,7 +91,7 @@ impl<'a> GpuWrapper<'a> {
         }
     }
 
-    async fn create_device(window: &Window) -> (wgpu::Surface, wgpu::Adapter, Device, wgpu::Queue) {
+    async fn create_device(window: &Window) -> (Surface, wgpu::Adapter, Device, wgpu::Queue) {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -354,12 +355,13 @@ impl<'a> GpuWrapper<'a> {
 
     /// Call whenever the window backing all this is resized, to update the various internal
     /// textures and buffers needed for the render pipeline
-    pub fn handle_resize(&mut self) {
-        let config = Self::surface_config(&self.surface, &self.adapter, self.window.inner_size());
+    pub fn handle_resize(&mut self, new_size: PhysicalSize<u32>) {
+        let config = Self::surface_config(&self.surface, &self.adapter, new_size);
         self.depth_texture = crate::texture::Texture::create_depth_texture(&self.device, &config);
         self.id_texture = crate::texture::Texture::create_id_texture(&self.device, &config);
         self.id_buffer = Arc::new(Self::create_id_buffer(&self.device, &self.id_texture.texture));
         self.surface.configure(&self.device, &config);
+        self.current_size = new_size;
     }
 
     /// Creates a config object for the surface given a physical size. Called by `handle_resize`
@@ -408,7 +410,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// Writes the scaling transform matrix to the uniform buffer, so the render pass can pick it up
     fn bind_for_render(&self) {
-        let PhysicalSize { width, height } = self.window.inner_size();
+        let PhysicalSize { width, height } = self.current_size;
         self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform(self.logical_size, (width, height))));
     }
 
