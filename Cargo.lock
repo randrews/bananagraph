@@ -2524,7 +2524,7 @@ dependencies = [
  "cgmath",
  "image",
  "pollster",
- "winit 0.29.15",
+ "winit 0.30.9",
 ]
 
 [[package]]
