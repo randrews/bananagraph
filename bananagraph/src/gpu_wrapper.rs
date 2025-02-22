@@ -4,58 +4,59 @@ use std::sync::Arc;
 use std::time::Duration;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, Texture, TextureFormat, TextureUsages};
-use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
 
 pub struct GpuWrapper<'a> {
-    // The handles to the actual GPU hardware
+    /// The handles to the actual GPU hardware
     adapter: wgpu::Adapter,
     device: Device,
 
-    // A queue to set up commands for a redraw
+    /// A queue to set up commands for a redraw
     queue: wgpu::Queue,
 
-    // Two render pipelines: one for the pixel data and one for
-    // sprite IDs for hit detection
+    /// Two render pipelines: one for the pixel data and one for
+    /// sprite IDs for hit detection
     render_pipeline: wgpu::RenderPipeline,
     id_pipeline: wgpu::RenderPipeline,
 
-    // The window and surface of that window that we're rendering to
+    /// The window and surface of that window that we're rendering to
     current_size: PhysicalSize<u32>,
     surface: Surface<'a>,
 
-    // The "logical" size of the window space, used for creating the
-    // scale transform
+    /// The "logical" size of the window space, used for creating the
+    /// scale transform
     pub logical_size: (u32, u32),
 
-    // Inputs to the render pipelines: a unit square, which we need
-    // buffers to store on the GPU, and a uniform buffer with the
-    // scale transform.
+    /// Inputs to the render pipelines: a unit square, which we need
+    /// buffers to store on the GPU, and a uniform buffer with the
+    /// scale transform.
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     render_uniform_buffer: Buffer,
 
-    // The nearest-neighbor sampler for a sharp pixel effect
+    /// The nearest-neighbor sampler for a sharp pixel effect
     sampler: wgpu::Sampler,
 
-    // A texture for the pipeline to write depth data to
+    /// A texture for the pipeline to write depth data to
     depth_texture: crate::texture::Texture,
 
-    // The textures we'll draw sprites from
+    /// The textures we'll draw sprites from
     spritesheets: Vec<crate::texture::Texture>,
 
-    // The texture the id pipeline outputs to, and the buffer
-    // we read them from
+    /// The texture the id pipeline outputs to, and the buffer
+    /// we read them from
     id_texture: crate::texture::Texture,
     id_buffer: Arc<Buffer>,
 }
 
 impl<'a> GpuWrapper<'a> {
-    pub async fn new(window: &'a Window, logical_size: (u32, u32)) -> Self {
+    pub async fn new(window: Arc<Window>) -> Self {
         let current_size = window.inner_size();
-        let (surface, adapter, device, queue) = Self::create_device(window).await;
+        let logical_size = current_size.to_logical::<u32>(window.scale_factor()).into();
+        let (surface, adapter, device, queue) = Self::create_device(window.clone()).await;
         let config = Self::surface_config(&surface, &adapter, window.inner_size());
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
         let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
@@ -91,7 +92,7 @@ impl<'a> GpuWrapper<'a> {
         }
     }
 
-    async fn create_device(window: &Window) -> (Surface, wgpu::Adapter, Device, wgpu::Queue) {
+    async fn create_device(window: Arc<Window>) -> (Surface<'a>, wgpu::Adapter, Device, wgpu::Queue) {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()

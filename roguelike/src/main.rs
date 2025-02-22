@@ -12,7 +12,7 @@ use crate::components::{OnMap, Player};
 use crate::terrain::recreate_terrain;
 
 pub struct GameState {
-    world: World
+    world: World,
 }
 
 impl Default for GameState {

@@ -1,21 +1,16 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
-use cgmath::{Point2, Vector2};
+use cgmath::Vector2;
 use hecs::{Entity, World};
 use rand::Rng;
-use bananagraph::{DrawingContext, Sprite, SpriteId};
+use winit::event::ElementState;
+use bananagraph::{Click, DrawingContext, GpuWrapper, Sprite, WindowEventHandler};
 use grid::{Coord, Grid, VecGrid};
 use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
 use crate::game_state::CaptureSteps::{FadeAnimation, FallAnimation, PieceSelection, SwapAnimation};
 use crate::matcha_board::MatchaBoard;
 use crate::piece::{Piece, PieceColor};
 use crate::piece::PieceColor::Empty;
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum ClickTarget {
-    Sprite { id: SpriteId },
-    Location { location: Point2<f64> }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum CaptureSteps {
@@ -33,27 +28,12 @@ pub struct GameState<'a, R: Rng> {
     step: CaptureSteps
 }
 
-impl<'a, R: Rng> GameState<'a, R> {
-    pub fn new(rng: &'a mut R, screen: (u32, u32)) -> Self {
-        let mut world = World::new();
-
-        let board = initialize_board(rng);
-
-        for (n, color) in board.iter().enumerate() {
-            let c = board.coord(n);
-            world.spawn((Piece::new(*color, c),));
-        }
-
-        Self {
-            world,
-            rng,
-            screen,
-            selected: None,
-            step: PieceSelection
-        }
+impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
+    fn init(&mut self, wrapper: &mut GpuWrapper) {
+        wrapper.add_texture(include_bytes!("shapes.png"), None);
     }
 
-    pub fn tick(&mut self, dt: Duration) {
+    fn tick(&mut self, dt: Duration) {
         // Go through all the animation types
         animation_system::<Pulse>(dt, &mut self.world);
         animation_system::<MoveAnimation>(dt, &mut self.world);
@@ -79,13 +59,100 @@ impl<'a, R: Rng> GameState<'a, R> {
                 FallAnimation => {
                     // Fall animations have now finished, see if there are more matches:
                     self.step = if self.any_matches() {
-                                    self.fade_pieces();
-                                    FadeAnimation
-                                } else {
-                                    PieceSelection
-                                };
+                        self.fade_pieces();
+                        FadeAnimation
+                    } else {
+                        PieceSelection
+                    };
                 }
             }
+        }
+    }
+
+    fn redraw(&self) -> Vec<Sprite> {
+        let mut sprites = vec![];
+        let dc = DrawingContext::new((self.screen.0 as f32, self.screen.1 as f32));
+
+        let mut query = self.world.query::<(&Piece, Option<&Pulse>, Option<&MoveAnimation>, Option<&Fade>)>();
+        for (ent, (piece, pulse, move_anim, fade)) in query.into_iter() {
+            // hecs will give us 0 as a sprite id, but bananagraph can't abide that, so, add something to it to
+            // ensure we can hear clicks on the sprite
+            let mut drawable = piece.as_drawable(ent.id() + 1000, self.screen);
+
+            if let Some(p) = pulse { drawable = p.apply_to(drawable) };
+            if let Some(m) = move_anim { drawable = m.apply_to(drawable) };
+            if let Some(f) = fade { drawable = f.apply_to(drawable) };
+
+            sprites.push(drawable.as_sprite(dc))
+        }
+
+        sprites
+    }
+
+    fn click(&mut self, click: Click) {
+        if click.state == ElementState::Released { return }
+
+        if let Some(id) = click.entity {
+            // If we're waiting on animations,
+            if self.step != PieceSelection || self.animation_blocked() { return }
+
+            // This is only ever clicked sprite ids, which are always an entity id + 1000: hecs will give 0 as
+            // entity ids, which bananagraph interprets as an empty sprite id
+            let ent = unsafe {
+                self.world.find_entity_from_id(id - 1000)
+            };
+
+            if let Some(selected) = self.selected {
+                let new_piece = *self.world.get::<&Piece>(ent).unwrap();
+                let selected_piece = *self.world.get::<&Piece>(selected).unwrap();
+
+                // Valid move?
+                if self.valid_move(selected_piece.position, new_piece.position) || self.valid_move(new_piece.position, selected_piece.position) {
+                    // Create and attach animations
+                    let (anim1, anim2) = Piece::swap_animations(selected_piece, new_piece);
+                    self.world.insert_one(selected, anim2).unwrap();
+                    self.world.insert_one(ent, anim1).unwrap();
+
+                    // Actually swap the pieces
+                    let pos_selected = selected_piece.position;
+                    let pos_new = new_piece.position;
+                    self.world.get::<&mut Piece>(selected).unwrap().position = pos_new;
+                    self.world.get::<&mut Piece>(ent).unwrap().position = pos_selected;
+                    self.selected = None;
+
+                    // Increment the step
+                    self.step = SwapAnimation
+                } else {
+                    // Invalid, clear the selection
+                    self.selected = None;
+                }
+                // Either way stop pulsing
+                self.world.remove_one::<Pulse>(selected).unwrap();
+            } else {
+                self.selected = Some(ent);
+                self.world.insert_one(ent, Pulse::new()).unwrap()
+            }
+        }
+    }
+}
+
+impl<'a, R: Rng> GameState<'a, R> {
+    pub fn new(rng: &'a mut R, screen: (u32, u32)) -> Self {
+        let mut world = World::new();
+
+        let board = initialize_board(rng);
+
+        for (n, color) in board.iter().enumerate() {
+            let c = board.coord(n);
+            world.spawn((Piece::new(*color, c),));
+        }
+
+        Self {
+            world,
+            rng,
+            screen,
+            selected: None,
+            step: PieceSelection
         }
     }
 
@@ -180,70 +247,6 @@ impl<'a, R: Rng> GameState<'a, R> {
             let c = board.coord(n);
             (c.x, c.y).into()
         }).collect()
-    }
-
-    pub fn redraw(&self) -> Vec<Sprite> {
-        let mut sprites = vec![];
-        let dc = DrawingContext::new((self.screen.0 as f32, self.screen.1 as f32));
-
-        let mut query = self.world.query::<(&Piece, Option<&Pulse>, Option<&MoveAnimation>, Option<&Fade>)>();
-        for (ent, (piece, pulse, move_anim, fade)) in query.into_iter() {
-            // hecs will give us 0 as a sprite id, but bananagraph can't abide that, so, add something to it to
-            // ensure we can hear clicks on the sprite
-            let mut drawable = piece.as_drawable(ent.id() + 1000, self.screen);
-
-            if let Some(p) = pulse { drawable = p.apply_to(drawable) };
-            if let Some(m) = move_anim { drawable = m.apply_to(drawable) };
-            if let Some(f) = fade { drawable = f.apply_to(drawable) };
-
-            sprites.push(drawable.as_sprite(dc))
-        }
-
-        sprites
-    }
-
-    pub fn click(&mut self, target: ClickTarget) {
-        if let ClickTarget::Sprite { id} = target {
-            // If we're waiting on animations,
-            if self.step != PieceSelection || self.animation_blocked() { return }
-
-            // This is only ever clicked sprite ids, which are always an entity id + 1000: hecs will give 0 as
-            // entity ids, which bananagraph interprets as an empty sprite id
-            let ent = unsafe {
-                self.world.find_entity_from_id(id - 1000)
-            };
-
-            if let Some(selected) = self.selected {
-                let new_piece = *self.world.get::<&Piece>(ent).unwrap();
-                let selected_piece = *self.world.get::<&Piece>(selected).unwrap();
-
-                // Valid move?
-                if self.valid_move(selected_piece.position, new_piece.position) || self.valid_move(new_piece.position, selected_piece.position) {
-                    // Create and attach animations
-                    let (anim1, anim2) = Piece::swap_animations(selected_piece, new_piece);
-                    self.world.insert_one(selected, anim2).unwrap();
-                    self.world.insert_one(ent, anim1).unwrap();
-
-                    // Actually swap the pieces
-                    let pos_selected = selected_piece.position;
-                    let pos_new = new_piece.position;
-                    self.world.get::<&mut Piece>(selected).unwrap().position = pos_new;
-                    self.world.get::<&mut Piece>(ent).unwrap().position = pos_selected;
-                    self.selected = None;
-
-                    // Increment the step
-                    self.step = SwapAnimation
-                } else {
-                    // Invalid, clear the selection
-                    self.selected = None;
-                }
-                // Either way stop pulsing
-                self.world.remove_one::<Pulse>(selected).unwrap();
-            } else {
-                self.selected = Some(ent);
-                self.world.insert_one(ent, Pulse::new()).unwrap()
-            }
-        }
     }
 
     fn board_from_world(&self) -> VecGrid<PieceColor> {

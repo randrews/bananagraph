@@ -1332,7 +1332,7 @@ dependencies = [
  "lazy_static",
  "pollster",
  "rand 0.9.0-beta.1",
- "winit 0.29.15",
+ "winit 0.30.9",
 ]
 
 [[package]]
