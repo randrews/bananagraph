@@ -763,7 +763,6 @@ dependencies = [
  "bananagraph",
  "cgmath",
  "pollster",
- "winit 0.29.15",
 ]
 
 [[package]]

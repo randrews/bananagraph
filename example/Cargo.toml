@@ -5,6 +5,5 @@ edition = "2021"
 
 [dependencies]
 bananagraph = { path = "../bananagraph" }
-winit = { version = "0.29", features = ["rwh_05"] }
 pollster = "0.3.0"
 cgmath = "0.18.0"
