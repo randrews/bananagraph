@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
-use cgmath::Vector2;
+use cgmath::{Point2, Vector2};
 use hecs::{Entity, World};
 use rand::Rng;
 use winit::event::ElementState;
-use bananagraph::{Click, DrawingContext, GpuWrapper, Sprite, WindowEventHandler};
+use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use grid::{Coord, Grid, VecGrid};
 use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
 use crate::game_state::CaptureSteps::{FadeAnimation, FallAnimation, PieceSelection, SwapAnimation};
@@ -69,7 +69,10 @@ impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
         }
     }
 
-    fn redraw(&self) -> Vec<Sprite> {
+    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
+    where
+        F: Fn(&Vec<Sprite>) -> IdBuffer,
+    {
         let mut sprites = vec![];
         let dc = DrawingContext::new((self.screen.0 as f32, self.screen.1 as f32));
 

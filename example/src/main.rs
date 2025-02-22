@@ -1,5 +1,5 @@
-use bananagraph::{DrawingContext, GpuWrapper, Sprite, WindowEventHandler};
-use cgmath::Deg;
+use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use cgmath::{Deg, Point2, Vector2};
 
 struct GameState {
 }
@@ -10,7 +10,8 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("background.png"), None);
     }
 
-    fn redraw(&self) -> Vec<Sprite> {
+    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _redraw_ids: F) -> Vec<Sprite>
+        where F: Fn(&Vec<Sprite>) -> IdBuffer {
         // let (w, h) = (400.0, 225.0);
         // let sprite = Sprite::new((0, 0), (32, 32))
         //     //.translate((-0.5, -0.5))

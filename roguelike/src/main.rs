@@ -3,10 +3,10 @@ mod terrain;
 mod animation;
 
 use std::time::Duration;
-use cgmath::Vector2;
+use cgmath::{Point2, Vector2};
 use hecs::World;
 use animation::BreatheAnimation;
-use bananagraph::{GpuWrapper, Sprite, WindowEventHandler};
+use bananagraph::{GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use grid::{Coord, Dir, VecGrid};
 use crate::components::{OnMap, Player};
 use crate::terrain::recreate_terrain;
@@ -63,10 +63,12 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
     }
 
-    fn redraw(&self) -> Vec<Sprite> {
+    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
+    where
+        F: Fn(&Vec<Sprite>) -> IdBuffer,
+    {
         OnMap::system(&self.world)
     }
-
     fn tick(&mut self, dt: Duration) {
         BreatheAnimation::system(&mut self.world, dt)
     }

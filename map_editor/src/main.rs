@@ -1,89 +1,14 @@
-use bananagraph::{DrawingContext, GpuWrapper, Sprite};
-use std::time::{Duration, Instant};
+use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use cgmath::num_traits::Pow;
-use cgmath::Vector2;
+use cgmath::{Point2, Vector2};
 use rand::Rng;
-use winit::dpi::LogicalSize;
-use winit::error::EventLoopError;
-use winit::event::{ElementState, Event, MouseButton, StartCause, WindowEvent};
-use winit::event_loop::ControlFlow;
+use winit::event::ElementState;
 use grid::{Coord, Grid, GridMut};
 use crate::board::{Board, Cell};
 use crate::iso_map::{AsSprite, IsoMap};
 
 mod board;
 mod iso_map;
-
-pub async fn run_window() -> Result<(), EventLoopError> {
-    let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
-
-    let window = winit::window::WindowBuilder::new()
-        .with_title("The Thing")
-        .with_inner_size(LogicalSize { width: 1280, height: 720 })
-        .with_min_inner_size(LogicalSize { width: 1280, height: 720 })
-        .build(&event_loop)?;
-
-    let mut wrapper = GpuWrapper::new(&window, (1280, 720)).await;
-    wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
-    // wrapper.add_texture(include_bytes!("background.png"), Some("background"));
-    wrapper.add_texture_from_array(create_background(720), 720, Some("background"));
-    let our_id = window.id();
-
-    let timer_length = Duration::from_millis(20);
-
-    // The mouse position is a float, but seems to still describe positions within the same coord
-    // space as the window, so just floor()ing it gives you reasonable coordinates
-    let mut mouse_pos: (f64, f64) = (-1f64, -1f64);
-
-    // Make a 10x10 board:
-    let mut board = Board::new(10, 7);
-
-    event_loop.run(move |event, target| {
-        match event {
-            // Exit if we click the little x
-            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } if window_id == our_id => {
-                target.exit();
-            }
-
-            // Redraw if it's redrawing time
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, window_id } if window_id == our_id => {
-                redraw_window(&wrapper, &board, mouse_pos);
-            },
-
-            // Resize if it's resizing time
-            Event::WindowEvent { event: WindowEvent::Resized(_), window_id } if window_id == our_id => wrapper.handle_resize(),
-
-            // Start the timer on init
-            Event::NewEvents(StartCause::Init) => {
-                target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
-            }
-
-            // When the timer fires, redraw thw window and restart the timer (update will go here)
-            Event::NewEvents(StartCause::ResumeTimeReached { .. }) => {
-                redraw_window(&wrapper, &board, mouse_pos);
-                target.set_control_flow(ControlFlow::WaitUntil(Instant::now() + timer_length));
-            }
-
-            // Update that the mouse moved if it did
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position: pos, device_id: _ },
-                window_id
-            } if window_id == our_id => {
-                mouse_pos = (pos.x, pos.y);
-            }
-
-            Event::WindowEvent {
-                window_id, event: WindowEvent::MouseInput { device_id: _, state: ElementState::Pressed, button: MouseButton::Left }
-            } if window_id == our_id => {
-                let ids = wrapper.get_sprite_ids().unwrap();
-                let id = ids[mouse_pos.into()];
-                toggle_wall(id, &mut board)
-            }
-
-            _ => {} // toss the others
-        }
-    })
-}
 
 fn toggle_wall(id: u32, board: &mut Board) {
     if id >= 100000 {
@@ -100,44 +25,6 @@ fn toggle_wall(id: u32, board: &mut Board) {
             _ => unreachable!()
         }
     }
-}
-
-fn redraw_window(wrapper: &GpuWrapper, board: &Board, mouse_pos: (f64, f64)) {
-    let iso_map = IsoMap::new(board, (32, 48), (32, 16));
-    let base_dc = DrawingContext::new((wrapper.logical_size.0 as f32, wrapper.logical_size.1 as f32));
-
-    let dims = iso_map.dimensions();
-    let dc = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
-
-    let mut sprites = iso_map.sprites(dc);
-    let mut buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
-
-    if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
-        let id = buffer[mouse_pos.into()];
-        if id >= 100000 {
-            let board_coord = sprite_id_to_coord(id, board.size().x);
-            sprites = shorten_walls(board, board_coord, sprites);
-            buffer = wrapper.redraw_ids(&sprites).expect("Drawing error");
-        }
-    }
-
-    if buffer.contains((mouse_pos.0 as u32, mouse_pos.1 as u32).into()) {
-        let id = buffer[mouse_pos.into()];
-        if id >= 100000 {
-            let board_coord = sprite_id_to_coord(id, board.size().x);
-            if let Some(Cell::White | Cell::Black) = board.get(board_coord) {
-                let highlight = highlight_sprites();
-                let z = iso_map.z_coord(board_coord);
-                sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord, &dc));
-                sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord, &dc));
-            }
-        }
-    }
-
-    // Push the background:
-    sprites.push(Sprite::new((0, 0), (720, 720)).with_layer(1).with_z(0.99999).with_tint((0.2, 0.3, 0.4, 1.0)));
-
-    wrapper.redraw(&sprites);
 }
 
 fn create_background(size: usize) -> Vec<u8> {
@@ -217,7 +104,66 @@ fn highlight_sprites() -> (Sprite, Sprite) {
     )
 }
 
+struct GameState {
+    board: Board
+}
+
+impl WindowEventHandler for GameState {
+    fn init(&mut self, wrapper: &mut GpuWrapper) {
+        wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
+        // wrapper.add_texture(include_bytes!("background.png"), Some("background"));
+        wrapper.add_texture_from_array(create_background(720), 720, Some("background"));
+    }
+
+    fn redraw<F>(&self, size: Vector2<u32>, mouse_pos: Point2<f64>, redraw_ids: F) -> Vec<Sprite>
+        where F: Fn(&Vec<Sprite>) -> IdBuffer {
+        let iso_map = IsoMap::new(&self.board, (32, 48), (32, 16));
+        let base_dc = DrawingContext::new((size.x as f32, size.y as f32));
+
+        let dims = iso_map.dimensions();
+        let dc = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
+
+        let mut sprites = iso_map.sprites(dc);
+        let mut buffer = redraw_ids(&sprites);
+
+        if buffer.contains((mouse_pos.x as u32, mouse_pos.y as u32).into()) {
+            let id = buffer[mouse_pos];
+            if id >= 100000 {
+                let board_coord = sprite_id_to_coord(id, self.board.size().x);
+                sprites = shorten_walls(&self.board, board_coord, sprites);
+                buffer = redraw_ids(&sprites);
+            }
+        }
+
+        if buffer.contains((mouse_pos.x as u32, mouse_pos.y as u32).into()) {
+            let id = buffer[mouse_pos];
+            if id >= 100000 {
+                let board_coord = sprite_id_to_coord(id, self.board.size().x);
+                if let Some(Cell::White | Cell::Black) = self.board.get(board_coord) {
+                    let highlight = highlight_sprites();
+                    let z = iso_map.z_coord(board_coord);
+                    sprites.push(iso_map.sprite(highlight.0.with_z(z - 0.0001), board_coord, &dc));
+                    sprites.push(iso_map.sprite(highlight.1.with_z(z - 0.0003), board_coord, &dc));
+                }
+            }
+        }
+
+        // Push the background:
+        sprites.push(Sprite::new((0, 0), (720, 720)).with_layer(1).with_z(0.99999).with_tint((0.2, 0.3, 0.4, 1.0)));
+
+        sprites
+    }
+
+    fn click(&mut self, event: Click) {
+        if let (ElementState::Pressed, Some(id)) = (event.state, event.entity) {
+            toggle_wall(id, &mut self.board)
+        }
+    }
+}
+
 pub fn main() {
     env_logger::init();
-    let _ = pollster::block_on(run_window());
+    let size = (1280, 720);
+    let board = Board::new(10, 7);
+    let _ = pollster::block_on(bananagraph::run_window("The Thing", size.into(), size.into(), GameState { board }));
 }

@@ -32,7 +32,8 @@ pub trait WindowEventHandler {
 
     /// Run periodically to create the list of sprites to draw.
     /// The default implementation returns an empty list
-    fn redraw(&self) -> Vec<Sprite> { vec![] }
+    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
+        where F: Fn(&Vec<Sprite>) -> IdBuffer { vec![] }
 
     /// Called at about 60 fps, with the actual duration between calls passed
     /// as a parameter.
@@ -120,7 +121,9 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         if let StartCause::ResumeTimeReached { .. } = cause {
             self.handler.tick(self.timer_length);
             if self.handler.running() {
-                self.id_buffer = Some(self.wrapper.as_mut().unwrap().redraw_with_ids(self.handler.redraw()).expect("Drawing error"));
+                let size = self.wrapper.as_ref().unwrap().logical_size.into();
+                let draw_ids = |s: &Vec<Sprite>| self.wrapper.as_ref().unwrap().redraw_ids(s).expect("Error drawing id buffer");
+                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw(size, self.mouse_pos, draw_ids)).expect("Drawing error"));
                 event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length));
             } else {
                 event_loop.exit()
@@ -150,7 +153,9 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
 
             // Redraw if it's redrawing time
             WindowEvent::RedrawRequested => {
-                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw()).expect("Drawing error"));
+                let size = self.wrapper.as_ref().unwrap().logical_size.into();
+                let draw_ids = |s: &Vec<Sprite>| self.wrapper.as_ref().unwrap().redraw_ids(s).expect("Error drawing id buffer");
+                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw(size, self.mouse_pos, draw_ids)).expect("Drawing error"));
             },
 
             // Resize if it's resizing time
