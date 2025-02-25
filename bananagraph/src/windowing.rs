@@ -9,7 +9,7 @@ use winit::event::{ElementState, KeyEvent, MouseButton, StartCause, WindowEvent}
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-use crate::{GpuWrapper, IdBuffer, Sprite, SpriteId};
+use crate::{GpuWrapper, IdBuffer, SpriteId};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Click {
@@ -30,10 +30,9 @@ pub trait WindowEventHandler {
     /// Run once at the creation of the window; put any one-time init code here, like
     fn init(&mut self, _wrapper: &mut GpuWrapper) {}
 
-    /// Run periodically to create the list of sprites to draw.
-    /// The default implementation returns an empty list
-    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
-        where F: Fn(&Vec<Sprite>) -> IdBuffer { vec![] }
+    /// Run periodically to redraw the window. If this returns Some, then the given `IdBuffer` is used to
+    /// handle future click events.
+    fn redraw(&self, mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer>;
 
     /// Called at about 60 fps, with the actual duration between calls passed
     /// as a parameter.
@@ -121,9 +120,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         if let StartCause::ResumeTimeReached { .. } = cause {
             self.handler.tick(self.timer_length);
             if self.handler.running() {
-                let size = self.wrapper.as_ref().unwrap().logical_size.into();
-                let draw_ids = |s: &Vec<Sprite>| self.wrapper.as_ref().unwrap().redraw_ids(s).expect("Error drawing id buffer");
-                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw(size, self.mouse_pos, draw_ids)).expect("Drawing error"));
+                self.id_buffer = self.handler.redraw(self.mouse_pos, self.wrapper.as_ref().unwrap());
                 event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length));
             } else {
                 event_loop.exit()
@@ -153,9 +150,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
 
             // Redraw if it's redrawing time
             WindowEvent::RedrawRequested => {
-                let size = self.wrapper.as_ref().unwrap().logical_size.into();
-                let draw_ids = |s: &Vec<Sprite>| self.wrapper.as_ref().unwrap().redraw_ids(s).expect("Error drawing id buffer");
-                self.id_buffer = Some(self.wrapper.as_ref().unwrap().redraw_with_ids(self.handler.redraw(size, self.mouse_pos, draw_ids)).expect("Drawing error"));
+                self.id_buffer = self.handler.redraw(self.mouse_pos, self.wrapper.as_ref().unwrap());
             },
 
             // Resize if it's resizing time

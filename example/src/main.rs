@@ -1,5 +1,5 @@
 use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
-use cgmath::{Deg, Point2, Vector2};
+use cgmath::{Deg, Point2};
 
 struct GameState {
 }
@@ -10,8 +10,7 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("background.png"), None);
     }
 
-    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _redraw_ids: F) -> Vec<Sprite>
-        where F: Fn(&Vec<Sprite>) -> IdBuffer {
+    fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         // let (w, h) = (400.0, 225.0);
         // let sprite = Sprite::new((0, 0), (32, 32))
         //     //.translate((-0.5, -0.5))
@@ -35,7 +34,7 @@ impl WindowEventHandler for GameState {
             .scale((0.5, 0.5))
             .translate((0.25, 0.5));
 
-        vec![
+        wrapper.redraw(vec![
             dc.place(bg, (0.0, 0.0)), // Just draw the grayness straight
             dc.place_rotated(sprite, (0.0, 0.0), Deg(45.0)), // Rotate the cube about its center
             sprite
@@ -53,7 +52,8 @@ impl WindowEventHandler for GameState {
                 .scale((1.0 / 400.0, 1.0 / 225.0)) // Scale everything back down by the size of the world, also removes distortion
                 .with_z(0.008),
             bg.with_z(0.9999)
-        ]
+        ]);
+        None
     }
 }
 

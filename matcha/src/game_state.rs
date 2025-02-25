@@ -4,7 +4,7 @@ use cgmath::{Point2, Vector2};
 use hecs::{Entity, World};
 use rand::Rng;
 use winit::event::ElementState;
-use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, WindowEventHandler};
 use grid::{Coord, Grid, VecGrid};
 use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
 use crate::game_state::CaptureSteps::{FadeAnimation, FallAnimation, PieceSelection, SwapAnimation};
@@ -69,10 +69,7 @@ impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
         }
     }
 
-    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
-    where
-        F: Fn(&Vec<Sprite>) -> IdBuffer,
-    {
+    fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let mut sprites = vec![];
         let dc = DrawingContext::new((self.screen.0 as f32, self.screen.1 as f32));
 
@@ -89,7 +86,7 @@ impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
             sprites.push(drawable.as_sprite(dc))
         }
 
-        sprites
+        wrapper.redraw_with_ids(sprites).ok()
     }
 
     fn click(&mut self, click: Click) {

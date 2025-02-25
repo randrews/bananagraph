@@ -115,8 +115,8 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture_from_array(create_background(720), 720, Some("background"));
     }
 
-    fn redraw<F>(&self, size: Vector2<u32>, mouse_pos: Point2<f64>, redraw_ids: F) -> Vec<Sprite>
-        where F: Fn(&Vec<Sprite>) -> IdBuffer {
+    fn redraw(&self, mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
+        let size = Point2::from(wrapper.logical_size);
         let iso_map = IsoMap::new(&self.board, (32, 48), (32, 16));
         let base_dc = DrawingContext::new((size.x as f32, size.y as f32));
 
@@ -124,14 +124,14 @@ impl WindowEventHandler for GameState {
         let dc = create_drawing_contexts((dims.x as f32, dims.y as f32).into(), base_dc);
 
         let mut sprites = iso_map.sprites(dc);
-        let mut buffer = redraw_ids(&sprites);
+        let mut buffer = wrapper.redraw_ids(&sprites).unwrap();
 
         if buffer.contains((mouse_pos.x as u32, mouse_pos.y as u32).into()) {
             let id = buffer[mouse_pos];
             if id >= 100000 {
                 let board_coord = sprite_id_to_coord(id, self.board.size().x);
                 sprites = shorten_walls(&self.board, board_coord, sprites);
-                buffer = redraw_ids(&sprites);
+                buffer = wrapper.redraw_ids(&sprites).unwrap();
             }
         }
 
@@ -151,7 +151,7 @@ impl WindowEventHandler for GameState {
         // Push the background:
         sprites.push(Sprite::new((0, 0), (720, 720)).with_layer(1).with_z(0.99999).with_tint((0.2, 0.3, 0.4, 1.0)));
 
-        sprites
+        wrapper.redraw_with_ids(sprites).ok()
     }
 
     fn click(&mut self, event: Click) {

@@ -1,6 +1,6 @@
 mod typeface;
 
-use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, WindowEventHandler};
 use cgmath::{Point2, Vector2};
 use crate::typeface::{Typeface, TypefaceBuilder};
 
@@ -22,12 +22,10 @@ impl WindowEventHandler for GameState {
         self.typeface = Some(builder.into_typeface(wrapper));
     }
 
-    fn redraw<F>(&self, _size: Vector2<u32>, _mouse_pos: Point2<f64>, _draw_ids: F) -> Vec<Sprite>
-    where
-        F: Fn(&Vec<Sprite>) -> IdBuffer,
-    {
+    fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let dc = DrawingContext::new((160.0, 120.0));
-        self.typeface.as_ref().unwrap().print(dc, (0.0, 40.0), "i made a thing to render\nvariable width bitmap fonts")
+        wrapper.redraw(self.typeface.as_ref().unwrap().print(dc, (0.0, 40.0), "i made a thing to render\nvariable width bitmap fonts"));
+        None
     }
 }
 
