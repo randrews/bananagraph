@@ -2,9 +2,11 @@ mod components;
 mod terrain;
 mod animation;
 
+use std::sync::Arc;
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
 use hecs::World;
+use winit::window::Window;
 use animation::BreatheAnimation;
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use grid::{Coord, Dir, VecGrid};
@@ -58,7 +60,7 @@ impl GameState {
 }
 
 impl WindowEventHandler for GameState {
-    fn init(&mut self, wrapper: &mut GpuWrapper) {
+    fn init(&mut self, wrapper: &mut GpuWrapper, _window: Arc<Window>) {
         wrapper.add_texture(include_bytes!("Dungeon.png"), Some("Dungeon.png"));
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
     }

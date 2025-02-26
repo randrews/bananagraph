@@ -1,9 +1,11 @@
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
 use hecs::{Entity, World};
 use rand::Rng;
 use winit::event::ElementState;
+use winit::window::Window;
 use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, WindowEventHandler};
 use grid::{Coord, Grid, VecGrid};
 use crate::animation::{animation_system, Animation, Fade, MoveAnimation, Pulse};
@@ -29,7 +31,7 @@ pub struct GameState<'a, R: Rng> {
 }
 
 impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
-    fn init(&mut self, wrapper: &mut GpuWrapper) {
+    fn init(&mut self, wrapper: &mut GpuWrapper, _window: Arc<Window>) {
         wrapper.add_texture(include_bytes!("shapes.png"), None);
     }
 

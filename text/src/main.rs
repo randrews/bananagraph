@@ -1,7 +1,9 @@
 mod typeface;
 
+use std::sync::Arc;
 use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, WindowEventHandler};
 use cgmath::{Point2, Vector2};
+use winit::window::Window;
 use crate::typeface::{Typeface, TypefaceBuilder};
 
 #[derive(Default)]
@@ -10,7 +12,7 @@ struct GameState {
 }
 
 impl WindowEventHandler for GameState {
-    fn init(&mut self, wrapper: &mut GpuWrapper) {
+    fn init(&mut self, wrapper: &mut GpuWrapper, _window: Arc<Window>) {
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
         builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
         builder.add_glyphs("ijklmnop", (7, 15), (1, 81), Some(1));

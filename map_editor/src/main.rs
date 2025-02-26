@@ -1,8 +1,10 @@
+use std::sync::Arc;
 use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use cgmath::num_traits::Pow;
 use cgmath::{Point2, Vector2};
 use rand::Rng;
 use winit::event::ElementState;
+use winit::window::Window;
 use grid::{Coord, Grid, GridMut};
 use crate::board::{Board, Cell};
 use crate::iso_map::{AsSprite, IsoMap};
@@ -109,7 +111,7 @@ struct GameState {
 }
 
 impl WindowEventHandler for GameState {
-    fn init(&mut self, wrapper: &mut GpuWrapper) {
+    fn init(&mut self, wrapper: &mut GpuWrapper, _window: Arc<Window>) {
         wrapper.add_texture(include_bytes!("iso_dungeon_world.png"), Some("dungeon"));
         // wrapper.add_texture(include_bytes!("background.png"), Some("background"));
         wrapper.add_texture_from_array(create_background(720), 720, Some("background"));

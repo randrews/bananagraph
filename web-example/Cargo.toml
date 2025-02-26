@@ -1,0 +1,26 @@
+[package]
+name = "web-example"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+strip = true
+
+[dependencies]
+cfg-if = "1"
+bananagraph = { path = "../bananagraph" }
+console_error_panic_hook = "0.1.6"
+console_log = "1.0"
+winit = { version = "0.30.9" }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Element",
+]}
+log = "0.4.22"
+cgmath = "0.18.0"

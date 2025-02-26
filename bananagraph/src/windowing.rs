@@ -28,7 +28,7 @@ pub enum Dir { North, South, East, West }
 /// `init` at minimum, you can't do very much.
 pub trait WindowEventHandler {
     /// Run once at the creation of the window; put any one-time init code here, like
-    fn init(&mut self, _wrapper: &mut GpuWrapper) {}
+    fn init(&mut self, _wrapper: &mut GpuWrapper, _window: Arc<Window>) {}
 
     /// Run periodically to redraw the window. If this returns Some, then the given `IdBuffer` is used to
     /// handle future click events.
@@ -133,8 +133,8 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         let window = Arc::new(window);
         self.window = Some(window.clone());
 
-        let mut wrapper = pollster::block_on(GpuWrapper::new(window));
-        self.handler.init(&mut wrapper);
+        let mut wrapper = pollster::block_on(GpuWrapper::new(window.clone()));
+        self.handler.init(&mut wrapper, window.clone());
         self.wrapper = Some(wrapper);
         event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length))
     }
