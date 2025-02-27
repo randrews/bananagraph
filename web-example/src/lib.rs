@@ -1,41 +1,34 @@
-use std::sync::Arc;
-use cgmath::Point2;
 use wasm_bindgen::prelude::*;
-use winit::dpi::PhysicalSize;
-use winit::window::Window;
-use bananagraph::{GpuWrapper, IdBuffer, WindowEventHandler};
+use web_sys::HtmlCanvasElement;
+use wgpu::SurfaceTarget;
+use wgpu::VertexStepMode::Instance;
+use bananagraph::GpuWrapper;
 
-struct Example {}
-
-impl WindowEventHandler for Example {
-    fn init(&mut self, _wrapper: &mut GpuWrapper, window: Arc<Window>) {
-        let _ = window.request_inner_size(PhysicalSize::new(450, 400));
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            use winit::platform::web::WindowExtWebSys;
-
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| {
-                    let dst = doc.get_element_by_id("wasm-example")?;
-                    let canvas = web_sys::Element::from(window.as_ref().canvas()?);
-                    dst.append_child(&canvas).ok()?;
-                    Some(())
-                })
-                .expect("Couldn't append canvas to document body.");
-        }
-    }
-
-    fn redraw(&self, _mouse_pos: Point2<f64>, _wrapper: &GpuWrapper) -> Option<IdBuffer> {
-        None
-    }
-}
-
-#[cfg_attr(target_arch="wasm32", wasm_bindgen(start))]
+#[wasm_bindgen(start)]
 pub fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init_with_level(log::Level::Warn).expect("Couldn't initialize logger");
+    console_log::init_with_level(log::Level::Debug).expect("Couldn't initialize logger");
+}
 
-    // Winit prevents sizing with CSS, so we have to set the size manually when on web.
+#[wasm_bindgen]
+pub async fn init_gpu_wrapper() {
+    let wrapper = web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let canvas = doc.get_element_by_id("main_canvas").expect("Expected to find a canvas with id main_canvas");
+
+            let canvas: HtmlCanvasElement = canvas.dyn_into().expect("element must be a canvas");
+            let size = (canvas.width(), canvas.height()).into();
+            let surface_target = SurfaceTarget::Canvas(canvas);
+            // let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            //     backends: wgpu::Backends::PRIMARY,
+            //     ..Default::default()
+            // });
+            //
+            // let surface = instance.create_surface(surface_target).expect("Failed to create surface");
+
+            // Some(surface)
+            Some(GpuWrapper::targeting(surface_target, size))
+        })
+        .expect("I have no idea what I'm doing").await;
 }

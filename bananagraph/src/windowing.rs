@@ -28,7 +28,7 @@ pub enum Dir { North, South, East, West }
 /// `init` at minimum, you can't do very much.
 pub trait WindowEventHandler {
     /// Run once at the creation of the window; put any one-time init code here, like
-    fn init(&mut self, _wrapper: &mut GpuWrapper, _window: Arc<Window>) {}
+    fn init(&mut self, _wrapper: &mut GpuWrapper) {}
 
     /// Run periodically to redraw the window. If this returns Some, then the given `IdBuffer` is used to
     /// handle future click events.
@@ -88,6 +88,7 @@ pub trait WindowEventHandler {
 }
 
 /// A struct that can impl ApplicationHandler for winit to send it events
+#[cfg(not(target_arch = "wasm32"))]
 struct App<'a, H> {
     /// The window can't be owned by App because it owns the GpuWrapper, which borrows the window (surface).
     /// So we store it in an Arc
@@ -114,6 +115,7 @@ struct App<'a, H> {
     id_buffer: Option<IdBuffer>
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
     // When the timer fires, redraw thw window and restart the timer (update will go here)
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
@@ -134,7 +136,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         self.window = Some(window.clone());
 
         let mut wrapper = pollster::block_on(GpuWrapper::new(window.clone()));
-        self.handler.init(&mut wrapper, window.clone());
+        self.handler.init(&mut wrapper);
         self.wrapper = Some(wrapper);
         event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length))
     }
@@ -197,6 +199,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn run_window(title: &str, initial_size: Vector2<u32>, min_size: Vector2<u32>, handler: impl WindowEventHandler) -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
     event_loop.set_control_flow(ControlFlow::Wait);

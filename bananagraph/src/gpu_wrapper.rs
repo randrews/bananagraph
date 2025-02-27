@@ -2,8 +2,9 @@ use crate::scale_transform;
 use std::default::Default;
 use std::sync::Arc;
 use std::time::Duration;
+use cgmath::Vector2;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, Texture, TextureFormat, TextureUsages};
+use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, SurfaceTarget, Texture, TextureFormat, TextureUsages};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 use crate::id_buffer::IdBuffer;
@@ -23,12 +24,12 @@ pub struct GpuWrapper<'a> {
     id_pipeline: wgpu::RenderPipeline,
 
     /// The window and surface of that window that we're rendering to
-    current_size: PhysicalSize<u32>,
+    current_size: Vector2<u32>,
     surface: Surface<'a>,
 
     /// The "logical" size of the window space, used for creating the
     /// scale transform
-    pub logical_size: (u32, u32),
+    pub logical_size: Vector2<u32>,
 
     /// Inputs to the render pipelines: a unit square, which we need
     /// buffers to store on the GPU, and a uniform buffer with the
@@ -53,11 +54,50 @@ pub struct GpuWrapper<'a> {
 }
 
 impl<'a> GpuWrapper<'a> {
+    pub async fn targeting(target: impl Into<SurfaceTarget<'a>>, size: Vector2<u32>) -> Self {
+        let target = target.into();
+        let (surface, adapter, device, queue) = Self::create_device(target).await;
+        let config = Self::surface_config(&surface, &adapter, size);
+        surface.configure(&device, &config);
+        let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
+        let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
+        let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
+        let sampler = Self::create_sampler(&device);
+        let id_buffer = Arc::new(Self::create_id_buffer(&device, &id_texture.texture));
+        let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
+        let index_buffer = Self::create_index_buffer(&device);
+        let shader = Self::create_shader(&device);
+        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader);
+        let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
+
+        Self {
+            adapter,
+            device,
+            queue,
+            render_pipeline,
+            id_pipeline,
+            current_size: size,
+            surface,
+            logical_size: size,
+            vertex_buffer,
+            index_buffer,
+            render_uniform_buffer,
+            sampler,
+            depth_texture,
+            id_texture,
+            id_buffer,
+            spritesheets: vec![],
+        }
+    }
+
     pub async fn new(window: Arc<Window>) -> Self {
-        let current_size = window.inner_size();
-        let logical_size = current_size.to_logical::<u32>(window.scale_factor()).into();
+        let current_size_physical = window.inner_size();
+        let current_size = (current_size_physical.width, current_size_physical.height).into();
+        let logical_size = current_size_physical.to_logical::<u32>(window.scale_factor());
+        let logical_size = (logical_size.width, logical_size.height).into();
         let (surface, adapter, device, queue) = Self::create_device(window.clone()).await;
-        let config = Self::surface_config(&surface, &adapter, window.inner_size());
+        let inner_size = window.inner_size();
+        let config = Self::surface_config(&surface, &adapter, (inner_size.width, inner_size.height).into());
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
         let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
         surface.configure(&device, &config);
@@ -92,38 +132,40 @@ impl<'a> GpuWrapper<'a> {
         }
     }
 
-    async fn create_device(window: Arc<Window>) -> (Surface<'a>, wgpu::Adapter, Device, wgpu::Queue) {
+    pub async fn create_device(target: impl Into<SurfaceTarget<'a>>) -> (Surface<'a>, wgpu::Adapter, Device, wgpu::Queue) {
+        let target = target.into();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
+            backends: wgpu::Backends::PRIMARY | wgpu::Backends::GL,
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance.create_surface(target).expect("Failed to create surface");
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: Some(&surface),
                 ..Default::default()
             })
             .await
-            .unwrap();
+            .expect("Failed to create adapter");
 
         let limits = wgpu::Limits {
             max_texture_dimension_2d: 8192,
-            ..wgpu::Limits::downlevel_defaults()
+            ..wgpu::Limits::downlevel_webgl2_defaults()
         };
 
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    required_features: wgpu::Features::BGRA8UNORM_STORAGE,
+                    //required_features: wgpu::Features::BGRA8UNORM_STORAGE,
+                    required_features: wgpu::Features::empty(),
                     required_limits: limits,
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
                 },
                 None,
             )
             .await
-            .unwrap();
+            .expect("Failed to create device / queue");
 
         (surface, adapter, device, queue)
     }
@@ -251,7 +293,7 @@ impl<'a> GpuWrapper<'a> {
                 entry_point: "fs_main",
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: TextureFormat::Bgra8Unorm,
+                    format: TextureFormat::Rgba8Unorm,
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -356,7 +398,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// Call whenever the window backing all this is resized, to update the various internal
     /// textures and buffers needed for the render pipeline
-    pub fn handle_resize(&mut self, new_size: PhysicalSize<u32>) {
+    pub fn handle_resize(&mut self, new_size: Vector2<u32>) {
         let config = Self::surface_config(&self.surface, &self.adapter, new_size);
         self.depth_texture = crate::texture::Texture::create_depth_texture(&self.device, &config);
         self.id_texture = crate::texture::Texture::create_id_texture(&self.device, &config);
@@ -366,13 +408,13 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// Creates a config object for the surface given a physical size. Called by `handle_resize`
-    fn surface_config(surface: &wgpu::Surface, adapter: &wgpu::Adapter, size: PhysicalSize<u32>) -> wgpu::SurfaceConfiguration {
+    fn surface_config(surface: &Surface, adapter: &wgpu::Adapter, size: Vector2<u32>) -> wgpu::SurfaceConfiguration {
         let surface_caps = surface.get_capabilities(adapter);
         wgpu::SurfaceConfiguration {
-            usage: TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            width: size.width,
-            height: size.height,
+            usage: TextureUsages::RENDER_ATTACHMENT, //TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
+            format: TextureFormat::Rgba8Unorm,
+            width: size.x,
+            height: size.y,
             present_mode: surface_caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: surface_caps.alpha_modes[0],
@@ -411,8 +453,7 @@ impl<'a> GpuWrapper<'a> {
 
     /// Writes the scaling transform matrix to the uniform buffer, so the render pass can pick it up
     fn bind_for_render(&self) {
-        let PhysicalSize { width, height } = self.current_size;
-        self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform(self.logical_size, (width, height))));
+        self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform(self.logical_size, self.current_size)));
     }
 
     /// The instance buffer contains the packed sprite data for the render pipeline to iterate over

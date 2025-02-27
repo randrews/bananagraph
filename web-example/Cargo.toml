@@ -10,17 +10,20 @@ crate-type = ["cdylib", "rlib"]
 strip = true
 
 [dependencies]
-cfg-if = "1"
 bananagraph = { path = "../bananagraph" }
 console_error_panic_hook = "0.1.6"
 console_log = "1.0"
-winit = { version = "0.30.9" }
 wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4.30"
+wasm-bindgen-futures = "0.4.50"
 web-sys = { version = "0.3", features = [
     "Document",
     "Window",
     "Element",
+    "HtmlCanvasElement"
 ]}
 log = "0.4.22"
-cgmath = "0.18.0"
+wgpu = { version="22.1.0", default-features = false, features = ["webgl"] }
+instant = { version = "0.1.12", features = ["wasm-bindgen"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
