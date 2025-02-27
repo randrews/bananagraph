@@ -369,8 +369,8 @@ impl<'a> GpuWrapper<'a> {
     fn surface_config(surface: &wgpu::Surface, adapter: &wgpu::Adapter, size: PhysicalSize<u32>) -> wgpu::SurfaceConfiguration {
         let surface_caps = surface.get_capabilities(adapter);
         wgpu::SurfaceConfiguration {
-            usage: TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],
