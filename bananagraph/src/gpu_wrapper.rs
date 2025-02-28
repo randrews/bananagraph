@@ -3,7 +3,7 @@ use std::default::Default;
 use std::sync::Arc;
 use cgmath::Vector2;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, SurfaceCapabilities, SurfaceTarget, Texture, TextureFormat, TextureUsages};
+use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, LoadOp, ShaderModule, StoreOp, Surface, SurfaceCapabilities, SurfaceTarget, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture, TextureFormat, TextureUsages};
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
 
@@ -92,7 +92,7 @@ impl<'a> GpuWrapper<'a> {
 
     pub async fn create_device(target: impl Into<SurfaceTarget<'a>>) -> (Surface<'a>, wgpu::Adapter, Device, wgpu::Queue) {
         let target = target.into();
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY | wgpu::Backends::GL,
             ..Default::default()
         });
@@ -228,7 +228,7 @@ impl<'a> GpuWrapper<'a> {
             layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[vertex_buffer_layout, RawSprite::desc()],
             },
@@ -247,7 +247,7 @@ impl<'a> GpuWrapper<'a> {
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
@@ -303,7 +303,7 @@ impl<'a> GpuWrapper<'a> {
             layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[vertex_buffer_layout, RawSprite::desc()],
             },
@@ -322,7 +322,7 @@ impl<'a> GpuWrapper<'a> {
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: "fs_id",
+                entry_point: Some("fs_id"),
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: TextureFormat::R32Uint,
@@ -512,15 +512,15 @@ impl<'a> GpuWrapper<'a> {
     fn read_id_texture(&self, encoder: &mut wgpu::CommandEncoder) {
         let size = self.id_texture.size;
 
-        let src = ImageCopyTexture {
+        let src = TexelCopyTextureInfo {
             texture: &self.id_texture.texture,
             mip_level: 0,
             origin: Default::default(),
             aspect: Default::default(),
         };
-        let dest = wgpu::ImageCopyBuffer {
+        let dest = wgpu::TexelCopyBufferInfo {
             buffer: &self.id_buffer,
-            layout: ImageDataLayout {
+            layout: TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(Self::id_buffer_width(size.x) * 4),
                 rows_per_image: Some(size.y),

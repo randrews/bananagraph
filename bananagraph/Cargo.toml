@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wgpu = { version="22.1.0", default-features = false, features = ["webgl", "wgsl"] }
+wgpu = { version="24.0.1", default-features = false, features = ["webgl", "wgsl"] }
 bytemuck = { version = "1.17.1", features = ["derive"] }
 winit = { version = "0.30.9" }
 image = "0.25.4"
 cgmath = "0.18.0"
 pollster = "0.3.0"
-log = "0.4.22"

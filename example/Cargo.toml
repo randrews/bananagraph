@@ -7,4 +7,3 @@ edition = "2021"
 bananagraph = { path = "../bananagraph" }
 pollster = "0.3.0"
 cgmath = "0.18.0"
-winit = { version = "0.30.9" }

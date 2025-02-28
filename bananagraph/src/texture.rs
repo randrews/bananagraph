@@ -1,5 +1,5 @@
 use cgmath::Vector2;
-use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
+use wgpu::{Device, Extent3d, Queue, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
 use image::{ImageError, RgbaImage};
 
 pub struct Texture {
@@ -43,14 +43,14 @@ impl Texture {
         let view = texture.create_view(&Default::default());
 
         queue.write_texture(
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             diffuse_rgba,
-            ImageDataLayout {
+            TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * dimensions.0),
                 rows_per_image: Some(dimensions.1),
