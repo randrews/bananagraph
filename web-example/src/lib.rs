@@ -1,16 +1,18 @@
 use wasm_bindgen::prelude::*;
-use web_sys::HtmlCanvasElement;
-use wgpu::SurfaceTarget;
-use bananagraph::{GpuWrapper, Sprite};
 
 #[wasm_bindgen(start)]
 pub fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init_with_level(log::Level::Debug).expect("Couldn't initialize logger");
+    console_log::init_with_level(log::Level::Error).expect("Couldn't initialize logger");
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub async fn init_gpu_wrapper() {
+    use web_sys::HtmlCanvasElement;
+    use wgpu::SurfaceTarget;
+    use bananagraph::{GpuWrapper, Sprite};
+
     let mut wrapper = web_sys::window()
         .and_then(|win| win.document())
         .and_then(|doc| {

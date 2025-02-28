@@ -28,4 +28,4 @@ wgpu = { version="22.1.0", default-features = false, features = ["webgl"] }
 instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = true
+wasm-opt = false

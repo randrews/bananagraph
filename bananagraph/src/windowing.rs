@@ -116,7 +116,7 @@ struct App<'a, H> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
+impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
     // When the timer fires, redraw thw window and restart the timer (update will go here)
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {

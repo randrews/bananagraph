@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
-use image::{GenericImageView, ImageError, RgbaImage};
+use image::{ImageError, RgbaImage};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
