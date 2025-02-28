@@ -18,7 +18,7 @@ pub async fn init_gpu_wrapper() {
             let canvas: HtmlCanvasElement = canvas.dyn_into().expect("element must be a canvas");
             let size = (canvas.width(), canvas.height()).into();
             let surface_target = SurfaceTarget::Canvas(canvas);
-            Some(GpuWrapper::targeting(surface_target, size))
+            Some(GpuWrapper::targeting(surface_target, size, size))
         })
         .expect("I have no idea what I'm doing").await;
 
