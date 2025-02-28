@@ -9,4 +9,3 @@ grid = { path = "../grid" }
 pollster = "0.3.0"
 cgmath = "0.18.0"
 hecs = "0.10.5"
-winit = "0.30.9"

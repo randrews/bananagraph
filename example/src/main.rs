@@ -1,13 +1,11 @@
-use std::sync::Arc;
 use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use cgmath::{Deg, Point2};
-use winit::window::Window;
 
 struct GameState {
 }
 
 impl WindowEventHandler for GameState {
-    fn init(&mut self, wrapper: &mut GpuWrapper, _window: Arc<Window>) {
+    fn init(&mut self, wrapper: &mut GpuWrapper) {
         wrapper.add_texture(include_bytes!("cube.png"), None);
         wrapper.add_texture(include_bytes!("background.png"), None);
     }

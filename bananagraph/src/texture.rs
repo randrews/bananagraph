@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
-use image::{ImageError, RgbaImage};
+use image::{GenericImageView, ImageError, RgbaImage};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -35,7 +35,7 @@ impl Texture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8UnormSrgb,
+            format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -69,7 +69,7 @@ impl Texture {
             depth_or_array_layers: 1,
         };
 
-        let desc = wgpu::TextureDescriptor {
+        let desc = TextureDescriptor {
             label,
             size,
             mip_level_count: 1,

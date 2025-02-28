@@ -1,12 +1,9 @@
 use crate::scale_transform;
 use std::default::Default;
 use std::sync::Arc;
-use std::time::Duration;
 use cgmath::Vector2;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, SurfaceTarget, Texture, TextureFormat, TextureUsages};
-use winit::dpi::PhysicalSize;
-use winit::window::Window;
+use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp, ShaderModule, StoreOp, Surface, SurfaceCapabilities, SurfaceTarget, Texture, TextureFormat, TextureUsages};
 use crate::id_buffer::IdBuffer;
 use crate::sprite::{RawSprite, Sprite};
 
@@ -54,10 +51,13 @@ pub struct GpuWrapper<'a> {
 }
 
 impl<'a> GpuWrapper<'a> {
-    pub async fn targeting(target: impl Into<SurfaceTarget<'a>>, size: Vector2<u32>) -> Self {
+    pub async fn targeting(target: impl Into<SurfaceTarget<'a>>, physical_size: Vector2<u32>, logical_size: Vector2<u32>) -> Self {
         let target = target.into();
         let (surface, adapter, device, queue) = Self::create_device(target).await;
-        let config = Self::surface_config(&surface, &adapter, size);
+        let surface_caps = surface.get_capabilities(&adapter);
+        let format = *surface_caps.formats.iter().find(|f| !f.is_srgb()).unwrap(); // Find the first format that's not srgb...
+
+        let config = Self::surface_config(&surface_caps, format, physical_size);
         surface.configure(&device, &config);
         let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
         let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
@@ -67,7 +67,7 @@ impl<'a> GpuWrapper<'a> {
         let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
         let index_buffer = Self::create_index_buffer(&device);
         let shader = Self::create_shader(&device);
-        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader);
+        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader, format);
         let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
 
         Self {
@@ -76,49 +76,7 @@ impl<'a> GpuWrapper<'a> {
             queue,
             render_pipeline,
             id_pipeline,
-            current_size: size,
-            surface,
-            logical_size: size,
-            vertex_buffer,
-            index_buffer,
-            render_uniform_buffer,
-            sampler,
-            depth_texture,
-            id_texture,
-            id_buffer,
-            spritesheets: vec![],
-        }
-    }
-
-    pub async fn new(window: Arc<Window>) -> Self {
-        let current_size_physical = window.inner_size();
-        let current_size = (current_size_physical.width, current_size_physical.height).into();
-        let logical_size = current_size_physical.to_logical::<u32>(window.scale_factor());
-        let logical_size = (logical_size.width, logical_size.height).into();
-        let (surface, adapter, device, queue) = Self::create_device(window.clone()).await;
-        let inner_size = window.inner_size();
-        let config = Self::surface_config(&surface, &adapter, (inner_size.width, inner_size.height).into());
-        let depth_texture = crate::texture::Texture::create_depth_texture(&device, &config);
-        let id_texture = crate::texture::Texture::create_id_texture(&device, &config);
-        surface.configure(&device, &config);
-
-        let render_uniform_buffer = Self::create_buffer(&device, "render-uniform-buffer", (16 * 4) as wgpu::BufferAddress, BufferUsages::UNIFORM | BufferUsages::COPY_DST);
-
-        let (vertex_buffer, vertex_buffer_layout) = Self::create_vertex_buffer(&device);
-        let index_buffer = Self::create_index_buffer(&device);
-        let id_buffer = Arc::new(Self::create_id_buffer(&device, &id_texture.texture));
-        let shader = Self::create_shader(&device);
-        let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader);
-        let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
-        let sampler = Self::create_sampler(&device);
-
-        Self {
-            adapter,
-            device,
-            queue,
-            render_pipeline,
-            id_pipeline,
-            current_size,
+            current_size: physical_size,
             surface,
             logical_size,
             vertex_buffer,
@@ -157,7 +115,6 @@ impl<'a> GpuWrapper<'a> {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    //required_features: wgpu::Features::BGRA8UNORM_STORAGE,
                     required_features: wgpu::Features::empty(),
                     required_limits: limits,
                     memory_hints: wgpu::MemoryHints::MemoryUsage,
@@ -231,7 +188,7 @@ impl<'a> GpuWrapper<'a> {
         })
     }
 
-    fn create_render_pipeline(device: &Device, vertex_buffer_layout: wgpu::VertexBufferLayout, shader: &ShaderModule) -> wgpu::RenderPipeline {
+    fn create_render_pipeline(device: &Device, vertex_buffer_layout: wgpu::VertexBufferLayout, shader: &ShaderModule, format: TextureFormat) -> wgpu::RenderPipeline {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("render pipeline"),
             entries: &[
@@ -267,7 +224,7 @@ impl<'a> GpuWrapper<'a> {
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
+            label: Some("render pipeline"),
             layout: Some(&Self::pipeline_layout_for(device, bind_group_layout)),
             vertex: wgpu::VertexState {
                 module: shader,
@@ -293,7 +250,7 @@ impl<'a> GpuWrapper<'a> {
                 entry_point: "fs_main",
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: TextureFormat::Rgba8Unorm,
+                    format,
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -399,7 +356,9 @@ impl<'a> GpuWrapper<'a> {
     /// Call whenever the window backing all this is resized, to update the various internal
     /// textures and buffers needed for the render pipeline
     pub fn handle_resize(&mut self, new_size: Vector2<u32>) {
-        let config = Self::surface_config(&self.surface, &self.adapter, new_size);
+        let surface_caps = self.surface.get_capabilities(&self.adapter);
+        let format = *surface_caps.formats.iter().find(|f| !f.is_srgb()).unwrap();
+        let config = Self::surface_config(&surface_caps, format, new_size);
         self.depth_texture = crate::texture::Texture::create_depth_texture(&self.device, &config);
         self.id_texture = crate::texture::Texture::create_id_texture(&self.device, &config);
         self.id_buffer = Arc::new(Self::create_id_buffer(&self.device, &self.id_texture.texture));
@@ -408,11 +367,10 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// Creates a config object for the surface given a physical size. Called by `handle_resize`
-    fn surface_config(surface: &Surface, adapter: &wgpu::Adapter, size: Vector2<u32>) -> wgpu::SurfaceConfiguration {
-        let surface_caps = surface.get_capabilities(adapter);
+    fn surface_config(surface_caps: &SurfaceCapabilities, format: TextureFormat, size: Vector2<u32>) -> wgpu::SurfaceConfiguration {
         wgpu::SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT, //TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
-            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            format,
             width: size.x,
             height: size.y,
             present_mode: surface_caps.present_modes[0],
@@ -617,8 +575,7 @@ impl<'a> GpuWrapper<'a> {
     }
 
     /// Redraws the display, but does not populate the id buffer, returning how long it took to do that.
-    pub fn redraw<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Duration {
-        let start = std::time::Instant::now();
+    pub fn redraw<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) {
         let tex = self.surface.get_current_texture().unwrap();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
@@ -627,10 +584,7 @@ impl<'a> GpuWrapper<'a> {
         self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
 
         self.queue.submit(Some(encoder.finish()));
-        tex.present();
-
-        let end = std::time::Instant::now();
-        end - start
+        tex.present()
     }
 
     /// Redraws the display and populates the id buffer, returning the buffer. This is marginally faster than

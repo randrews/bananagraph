@@ -134,8 +134,11 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         let window = event_loop.create_window(self.attrs.clone()).unwrap();
         let window = Arc::new(window);
         self.window = Some(window.clone());
-
-        let mut wrapper = pollster::block_on(GpuWrapper::new(window.clone()));
+        let physical_size = window.inner_size();
+        let physical_size = Vector2::from((physical_size.width, physical_size.height));
+        let logical_size = window.inner_size().to_logical(window.scale_factor());
+        let logical_size = Vector2::from((logical_size.width, logical_size.height));
+        let mut wrapper = pollster::block_on(GpuWrapper::targeting(window.clone(), physical_size, logical_size));
         self.handler.init(&mut wrapper);
         self.wrapper = Some(wrapper);
         event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length))
@@ -157,7 +160,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
 
             // Resize if it's resizing time
             WindowEvent::Resized(new_size)  => {
-                self.wrapper.as_mut().unwrap().handle_resize(new_size)
+                self.wrapper.as_mut().unwrap().handle_resize((new_size.width, new_size.height).into())
             }
 
             // Update that the mouse moved if it did
