@@ -1,8 +1,9 @@
-import init, { init_gpu_wrapper } from '../pkg/web_example.js'
+import init, { init_gpu_wrapper, draw_toast } from '../pkg/web_example.js'
 
 document.addEventListener('DOMContentLoaded', () => {
     init().then(async () => {
-        init_gpu_wrapper()
+        const wrapper = await init_gpu_wrapper('main_canvas')
+        draw_toast(wrapper)
         // const canvas = document.querySelector('canvas')
         // const game = new Game();
         // const display = new Display();
