@@ -88,6 +88,7 @@ pub trait WindowEventHandler {
 }
 
 /// A struct that can impl ApplicationHandler for winit to send it events
+#[cfg(not(target_arch = "wasm32"))]
 struct App<'a, H> {
     /// The window can't be owned by App because it owns the GpuWrapper, which borrows the window (surface).
     /// So we store it in an Arc
@@ -114,7 +115,8 @@ struct App<'a, H> {
     id_buffer: Option<IdBuffer>
 }
 
-impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
+#[cfg(not(target_arch = "wasm32"))]
+impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
     // When the timer fires, redraw thw window and restart the timer (update will go here)
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         if let StartCause::ResumeTimeReached { .. } = cause {
@@ -132,8 +134,11 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
         let window = event_loop.create_window(self.attrs.clone()).unwrap();
         let window = Arc::new(window);
         self.window = Some(window.clone());
-
-        let mut wrapper = pollster::block_on(GpuWrapper::new(window));
+        let physical_size = window.inner_size();
+        let physical_size = Vector2::from((physical_size.width, physical_size.height));
+        let logical_size = window.inner_size().to_logical(window.scale_factor());
+        let logical_size = Vector2::from((logical_size.width, logical_size.height));
+        let mut wrapper = pollster::block_on(GpuWrapper::targeting(window.clone(), physical_size, logical_size));
         self.handler.init(&mut wrapper);
         self.wrapper = Some(wrapper);
         event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length))
@@ -155,7 +160,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
 
             // Resize if it's resizing time
             WindowEvent::Resized(new_size)  => {
-                self.wrapper.as_mut().unwrap().handle_resize(new_size)
+                self.wrapper.as_mut().unwrap().handle_resize((new_size.width, new_size.height).into())
             }
 
             // Update that the mouse moved if it did
@@ -197,6 +202,7 @@ impl<'a, H: WindowEventHandler> ApplicationHandler for App<'a, H> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn run_window(title: &str, initial_size: Vector2<u32>, min_size: Vector2<u32>, handler: impl WindowEventHandler) -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
     event_loop.set_control_flow(ControlFlow::Wait);

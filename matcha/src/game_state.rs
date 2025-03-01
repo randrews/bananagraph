@@ -28,7 +28,7 @@ pub struct GameState<'a, R: Rng> {
     step: CaptureSteps
 }
 
-impl<'a, R: Rng> WindowEventHandler for GameState<'a, R> {
+impl<R: Rng> WindowEventHandler for GameState<'_, R> {
     fn init(&mut self, wrapper: &mut GpuWrapper) {
         wrapper.add_texture(include_bytes!("shapes.png"), None);
     }

@@ -116,7 +116,7 @@ impl WindowEventHandler for GameState {
     }
 
     fn redraw(&self, mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
-        let size = Point2::from(wrapper.logical_size);
+        let size = wrapper.logical_size;
         let iso_map = IsoMap::new(&self.board, (32, 48), (32, 16));
         let base_dc = DrawingContext::new((size.x as f32, size.y as f32));
 

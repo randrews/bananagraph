@@ -1,5 +1,5 @@
 use cgmath::Vector2;
-use wgpu::{Device, Extent3d, ImageCopyTexture, ImageDataLayout, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
+use wgpu::{Device, Extent3d, Queue, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView};
 use image::{ImageError, RgbaImage};
 
 pub struct Texture {
@@ -35,7 +35,7 @@ impl Texture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8UnormSrgb,
+            format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -43,14 +43,14 @@ impl Texture {
         let view = texture.create_view(&Default::default());
 
         queue.write_texture(
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             diffuse_rgba,
-            ImageDataLayout {
+            TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * dimensions.0),
                 rows_per_image: Some(dimensions.1),
@@ -69,7 +69,7 @@ impl Texture {
             depth_or_array_layers: 1,
         };
 
-        let desc = wgpu::TextureDescriptor {
+        let desc = TextureDescriptor {
             label,
             size,
             mip_level_count: 1,

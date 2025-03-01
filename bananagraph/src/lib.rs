@@ -10,4 +10,7 @@ pub use gpu_wrapper::GpuWrapper;
 pub use id_buffer::IdBuffer;
 pub use sprite::{Sprite, SpriteId};
 pub use drawing_context::DrawingContext;
-pub use windowing::{Click, WindowEventHandler, run_window, Dir};
+pub use windowing::{Click, WindowEventHandler, Dir};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use windowing::{run_window};

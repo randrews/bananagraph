@@ -1,3 +1,5 @@
+use cgmath::Vector2;
+
 /// Create a transform matrix to scale / center a texture into a larger rectangle,
 /// scaling it up as much as possible but only evenly. This is copied from the `pixels`
 /// crate: https://github.com/parasyte/pixels/blob/main/src/renderers.rs
@@ -9,9 +11,9 @@
 /// the nearest-neighbor sampler that this works with; at a high enough resolution it
 /// may actually just look fine blurry. So this may get cut down or altered later.
 #[rustfmt::skip]
-pub fn transform(texture_size: (u32, u32), window_size: (u32, u32)) -> [f32; 16] {
-    let (texture_width, texture_height) = texture_size;
-    let (screen_width, screen_height) = window_size;
+pub fn transform(texture_size: Vector2<u32>, window_size: Vector2<u32>) -> [f32; 16] {
+    let (texture_width, texture_height) = texture_size.into();
+    let (screen_width, screen_height) = window_size.into();
     let (screen_width, screen_height) = (screen_width as f32, screen_height as f32);
 
     let width_ratio = (screen_width / texture_width as f32).max(1.0);
