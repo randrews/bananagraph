@@ -24,6 +24,11 @@ impl Index<Point2<f64>> for IdBuffer {
     type Output = SpriteId;
 
     fn index(&self, index: Point2<f64>) -> &Self::Output {
-        &self.data[index.x as usize + index.y as usize * self.width as usize]
+        let i = index.x as usize + index.y as usize * self.width as usize;
+        if i < self.data.len() {
+            &self.data[i]
+        } else {
+            &0
+        }
     }
 }

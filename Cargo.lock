@@ -2146,6 +2146,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "sevendrl"
+version = "0.1.0"
+dependencies = [
+ "bananagraph",
+ "cgmath",
+ "console_error_panic_hook",
+ "console_log",
+ "grid",
+ "instant",
+ "log",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "wgpu",
+]
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

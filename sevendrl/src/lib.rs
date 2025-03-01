@@ -1,0 +1,42 @@
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+use crate::js_gpu_wrapper::JsGpuWrapper;
+
+mod js_gpu_wrapper;
+mod game_state;
+
+#[wasm_bindgen(start)]
+pub fn run() {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    console_log::init_with_level(log::Level::Info).expect("Couldn't initialize logger");
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub async fn init_game(canvas_id: &str) -> JsGpuWrapper {
+    use web_sys::HtmlCanvasElement;
+    use wgpu::SurfaceTarget;
+    use bananagraph::{GpuWrapper, WindowEventHandler};
+    use crate::game_state::GameState;
+
+    let mut wrapper = web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| {
+            let canvas = doc.get_element_by_id(canvas_id).expect("Expected to find a canvas with the given id");
+            let canvas: HtmlCanvasElement = canvas.dyn_into().expect("element must be a canvas");
+            let size = (canvas.width(), canvas.height()).into();
+            let surface_target = SurfaceTarget::Canvas(canvas);
+            Some(GpuWrapper::targeting(surface_target, size, size))
+        })
+        .expect("Failed to init wgpu somehow").await;
+
+    let mut handler = GameState::new();
+    handler.init(&mut wrapper);
+
+    JsGpuWrapper {
+        wrapper,
+        handler,
+        ids: None,
+    }
+}

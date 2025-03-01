@@ -5,11 +5,17 @@ use cgmath::{Point2, Vector2};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
-use winit::event::{ElementState, KeyEvent, MouseButton, StartCause, WindowEvent};
+use winit::event::{KeyEvent, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 use crate::{GpuWrapper, IdBuffer, SpriteId};
+
+#[derive(Copy,Clone,Debug,PartialEq)]
+pub enum MouseButton { Left, Right }
+
+#[derive(Copy,Clone,Debug,PartialEq)]
+pub enum ElementState { Pressed, Released }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Click {
@@ -58,7 +64,7 @@ pub trait WindowEventHandler {
     /// to use those as well.
     fn key(&mut self, event: KeyEvent, _is_synthetic: bool) {
         // We can ignore release events...
-        if event.state == ElementState::Released { return }
+        if event.state == winit::event::ElementState::Released { return }
 
         match event.logical_key {
             Key::Named(NamedKey::ArrowDown) => self.arrow_key(Dir::South),
@@ -182,6 +188,17 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
                             Some(id)
                         }
                     }
+                };
+
+                let state = match state {
+                    winit::event::ElementState::Pressed => ElementState::Pressed,
+                    winit::event::ElementState::Released => ElementState::Released
+                };
+
+                let button = match button {
+                    winit::event::MouseButton::Left => MouseButton::Left,
+                    winit::event::MouseButton::Right => MouseButton::Right,
+                    _ => MouseButton::Left // TODO handle other buttons
                 };
 
                 self.handler.click(Click {

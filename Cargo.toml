@@ -5,7 +5,7 @@ members = [
     "grid",
     "map_editor",
     "matcha",
-    "roguelike",
+    "roguelike", "sevendrl",
     "text",
     "web-example"]
 resolver = "2"
