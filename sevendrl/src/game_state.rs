@@ -99,6 +99,10 @@ impl GameState {
         ));
     }
 
+    pub fn create_status_bar(&mut self) {
+        self.world.spawn((StatusBar { message: String::from("Welcome!") },));
+    }
+
     fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
         let loc = loc.into();
         self.world.query_mut::<(Q, &OnMap)>().into_iter()

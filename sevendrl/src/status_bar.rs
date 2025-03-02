@@ -5,7 +5,7 @@ use bananagraph::{DrawingContext, Sprite, Typeface};
 
 #[derive(Clone)]
 pub struct StatusBar {
-    message: String
+    pub message: String
 }
 
 impl StatusBar {
@@ -13,8 +13,10 @@ impl StatusBar {
         let mut sprites = Self::frame_sprites();
         let dc = DrawingContext::new((960.0 / 2.0, 544.0 / 2.0));
 
-        let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 13.0);
-        sprites.append(&mut typeface.print(dc, coord, "#*# 'Arise', adventurer! Slay things [furiously] #*#"));
+        if let Some((_, status_bar)) = world.query::<&StatusBar>().into_iter().next() {
+            let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 13.0);
+            sprites.append(&mut typeface.print(dc, coord, &status_bar.message.as_str()));
+        }
         // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 0))));
         // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 1))));
         // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 2))));
