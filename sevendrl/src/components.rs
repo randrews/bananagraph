@@ -10,7 +10,7 @@ pub struct OnMap {
 
 impl OnMap {
     pub fn system(world: &World) -> Vec<Sprite> {
-        let dc = DrawingContext::new((480.0, 260.0));
+        let dc = DrawingContext::new((960.0 / 2.0, 540.0 / 2.0));
         let mut sprites = vec![];
 
         for (_, (on_map,)) in world.query::<(&OnMap,)>().iter() {

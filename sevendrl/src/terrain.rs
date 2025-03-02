@@ -1,5 +1,6 @@
 use cgmath::Point2;
 use hecs::{Entity, World};
+use log::__private_api::loc;
 use bananagraph::Sprite;
 use grid::{CellType, Grid, VecGrid};
 use crate::components::OnMap;
@@ -31,7 +32,11 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
                 world.spawn((Wall, Terrain, OnMap { location, sprite }));
             }
             CellType::Clear | CellType::Door => {
-                let sprite = Sprite::new((144, 128), (16, 16));
+                let sprite = if (location.x + location.y) % 2 == 0 {
+                    Sprite::new((144, 128), (16, 16))
+                } else {
+                    Sprite::new((144, 96), (16, 16))
+                };
                 world.spawn((Terrain, OnMap { location, sprite }));
             },
             _ => {}
