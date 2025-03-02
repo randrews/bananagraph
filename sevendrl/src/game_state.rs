@@ -3,7 +3,7 @@ use cgmath::{Point2, Vector2};
 use hecs::{Entity, Query, World};
 use log::info;
 use tinyrand::{Seeded, Xorshift};
-use bananagraph::{GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{OnMap, Player};
@@ -14,7 +14,8 @@ use crate::terrain::{recreate_terrain, Wall};
 #[derive(Default)]
 pub struct GameState {
     pub(crate) world: World,
-    pub(crate) rand: Xorshift
+    pub(crate) rand: Xorshift,
+    pub(crate) typeface: Option<Typeface>
 }
 
 impl WindowEventHandler for GameState {
@@ -22,11 +23,36 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("Dungeon.png"), Some("Dungeon.png"));
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
         wrapper.add_texture(include_bytes!("Frames.png"), Some("Frames.png"));
+
+        let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
+        builder.add_glyphs("ABCDEFGH", (7, 15), (1, 1), Some(1));
+        builder.add_glyphs("IJKLMNOP", (7, 15), (1, 17), Some(1));
+        builder.add_glyphs("QRSTUVWX", (7, 15), (1, 33), Some(1));
+        builder.add_glyphs("YZ", (7, 15), (1, 49), Some(1));
+
+        builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
+        builder.add_glyphs("ijklmnop", (7, 15), (1, 81), Some(1));
+        builder.add_glyphs("qrstuvwx", (7, 15), (1, 97), Some(1));
+        builder.add_glyphs("yz", (7, 15), (1, 113), Some(1));
+
+        builder.add_glyphs("01234567", (7, 15), (1, 129), Some(1));
+        builder.add_glyphs("89", (7, 15), (1, 145), Some(1));
+
+        builder.add_glyphs("!~#$%&'", (7, 15), (9, 161), Some(1));
+        builder.add_glyphs("()*+,-./", (7, 15), (1, 177), Some(1));
+        builder.add_glyphs(":;<=>?[]", (7, 15), (1, 193), Some(1));
+        builder.add_glyphs("\\^_`{}|", (7, 15), (1, 209), Some(1));
+        builder.add_glyphs("@", (7, 15), (1, 225), Some(1));
+
+        builder.set_x_offset('p', -3);
+        builder.set_x_offset('j', -3);
+        builder.add_sized_glyph(' ', (3, 1), (17, 113));
+        self.typeface = Some(builder.into_typeface(wrapper));
     }
 
     fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let mut sprites = OnMap::system(&self.world);
-        sprites.append(&mut StatusBar::system(&self.world));
+        sprites.append(&mut StatusBar::system(&self.world, self.typeface.as_ref().unwrap()));
         wrapper.redraw_with_ids(sprites).ok()
     }
 
