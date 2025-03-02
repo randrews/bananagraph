@@ -28,7 +28,9 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
         let location = map.coord(n);
         match c {
             CellType::Wall => {
-                let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
+                // Treat walls and doors as equivalent for wall sprites. I may change my mind here later.
+                let sprite = wall_tile(map.for_neighbors(location, |_, c| *c == CellType::Wall || *c == CellType::Door));
+                //let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
                 world.spawn((Wall, Terrain, OnMap { location, sprite }));
             }
             CellType::Clear => {
