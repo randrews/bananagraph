@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use web_sys::js_sys::Math::pow;
 #[cfg(target_arch = "wasm32")]
 use crate::js_gpu_wrapper::JsGpuWrapper;
 
@@ -8,6 +7,7 @@ mod game_state;
 mod components;
 mod terrain;
 mod animation;
+mod door;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -22,6 +22,7 @@ pub async fn init_game(canvas_id: &str, seed: f64) -> JsGpuWrapper {
     use wgpu::SurfaceTarget;
     use bananagraph::{GpuWrapper, WindowEventHandler};
     use crate::game_state::GameState;
+    use web_sys::js_sys::Math::pow;
 
     let mut wrapper = web_sys::window()
         .and_then(|win| win.document())

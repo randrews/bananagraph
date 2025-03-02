@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut, Index};
 use std::time::Duration;
-use log::{debug, info};
+use log::debug;
 use bananagraph::{Click, Dir, ElementState, GpuWrapper, IdBuffer, MouseButton, WindowEventHandler};
 use wasm_bindgen::prelude::wasm_bindgen;
 use crate::game_state::GameState;

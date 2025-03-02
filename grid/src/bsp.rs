@@ -1,4 +1,3 @@
-use std::cmp::max;
 use cgmath::Vector2;
 use tinyrand::Rand;
 use crate::VecGrid;
@@ -75,7 +74,7 @@ fn divide_v(rng: &mut impl Rand, max_depth: u32, mut grid: VecGrid<CellType>, to
         grid[(wall_coord, y)] = CellType::Wall
     }
     let door_coord = (rng.next_u32() % room_size.y as u32) as i32 + top_left.y;
-    grid[(wall_coord, door_coord as i32)] = CellType::Door;
+    grid[(wall_coord, door_coord)] = CellType::Door;
 
     if depth < max_depth {
         grid = divide_h(rng, max_depth, grid, top_left, (wall_coord - top_left.x, room_size.y), depth + 1);

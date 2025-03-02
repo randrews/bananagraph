@@ -1,18 +1,19 @@
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
-use hecs::{Query, World};
+use hecs::{Entity, Query, World};
 use log::info;
 use tinyrand::{Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{OnMap, Player};
+use crate::door::Door;
 use crate::terrain::{recreate_terrain, Wall};
 
 #[derive(Default)]
 pub struct GameState {
-    world: World,
-    rand: Xorshift
+    pub(crate) world: World,
+    pub(crate) rand: Xorshift
 }
 
 impl WindowEventHandler for GameState {
@@ -68,29 +69,17 @@ impl GameState {
         ));
     }
 
-    fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<<Q as Query>::Item<'_>> {
+    fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
         let loc = loc.into();
         self.world.query_mut::<(Q, &OnMap)>().into_iter()
             .filter_map(|(e, (q, on_map))| {
                 if on_map.location == loc {
-                    Some(q)
+                    Some((e, q))
                 } else {
                     None
                 }
             }).collect()
     }
-
-    // fn find_on_map<'a, Q: Query + 'a>(&'a self, loc: impl Into<Vector2<i32>>) -> Vec<<Q as Query>::Item<'a>> {
-    //     let loc = loc.into();
-    //     self.world.query::<(Q, &OnMap)>().into_iter()
-    //         .filter_map(|(e, (q, on_map))| {
-    //             if on_map.location == loc {
-    //                 Some(q)
-    //             } else {
-    //                 None
-    //             }
-    //         }).collect()
-    // }
 
     fn exists_on_map<Q: Query>(&self, loc: impl Into<Vector2<i32>>) -> bool {
         let loc = loc.into();
@@ -105,7 +94,15 @@ impl GameState {
 
     pub fn walk(&mut self, dir: Dir) {
         let new_loc = self.get_player::<&OnMap>().location.translate(dir);
-        if self.find_on_map::<&Wall>(new_loc).is_empty() {
+
+        // First check for walls:
+        if self.exists_on_map::<&Wall>(new_loc) { return }
+
+        // Now bump doors:
+        let can_move = Door::try_move(self, new_loc);
+
+        // If all the bumps let us through, actually move:
+        if can_move {
             self.get_player::<&mut OnMap>().location = new_loc;
         }
     }
@@ -114,19 +111,6 @@ impl GameState {
     // to wasm32.
     #[allow(dead_code)]
     pub fn new(seed: u64) -> Self {
-        // let map: VecGrid<char> = VecGrid::from([
-        //     "..........",
-        //     "..######..",
-        //     "..#....#..",
-        //     "..#..###..",
-        //     "..####.#..",
-        //     "...#...#..",
-        //     "...#...#..",
-        //     "...#####..",
-        //     "..........",
-        //     "..........",
-        // ].join("\n").as_str());
-
         let mut game_state = Self::default();
         game_state.seed(seed);
         let map = create_bsp_map((64, 64), 6, &mut game_state.rand);

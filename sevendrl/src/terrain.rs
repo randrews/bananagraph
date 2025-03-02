@@ -1,9 +1,9 @@
 use cgmath::Point2;
 use hecs::{Entity, World};
-use log::__private_api::loc;
 use bananagraph::Sprite;
 use grid::{CellType, Grid, VecGrid};
 use crate::components::OnMap;
+use crate::door::Door;
 
 /// Walls are immovable terrain that can't be walked through
 #[derive(Copy, Clone, Debug)]
@@ -31,7 +31,7 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
                 let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
                 world.spawn((Wall, Terrain, OnMap { location, sprite }));
             }
-            CellType::Clear | CellType::Door => {
+            CellType::Clear => {
                 let sprite = if (location.x + location.y) % 2 == 0 {
                     Sprite::new((144, 128), (16, 16))
                 } else {
@@ -39,7 +39,10 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
                 };
                 world.spawn((Terrain, OnMap { location, sprite }));
             },
-            _ => {}
+            CellType::Door => {
+                let sprite = Sprite::new((96, 32), (16, 16));
+                world.spawn((Terrain, Door { open: false }, OnMap { location, sprite }));
+            }
         }
     }
 }
