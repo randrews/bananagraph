@@ -23,6 +23,7 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("Dungeon.png"), Some("Dungeon.png"));
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
         wrapper.add_texture(include_bytes!("Frames.png"), Some("Frames.png"));
+        wrapper.add_texture(include_bytes!("Icons.png"), Some("Icons.png"));
 
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
         builder.add_glyphs("ABCDEFGH", (7, 15), (1, 1), Some(1));
@@ -93,7 +94,7 @@ impl GameState {
 
         // Spawn a new player
         self.world.spawn((
-            Player,
+            Player::default(),
             OnMap { location, sprite: frames[0] },
             BreatheAnimation::new(frames)
         ));
@@ -150,6 +151,7 @@ impl GameState {
         let map = create_bsp_map((64, 64), 6, &mut game_state.rand);
         game_state.set_map(map);
         game_state.set_player((4, 2));
+        game_state.create_status_bar();
         game_state
     }
 }

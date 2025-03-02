@@ -165,6 +165,22 @@ impl Typeface {
         }
         sprites
     }
+
+    /// Return the width a string will take up if printed. TODO: needs to be aware of newlines
+    pub fn width<'a>(&self, s: impl Into<&'a str>) -> f32 {
+        let mut x = 0f32;
+        for ch in s.into().chars() {
+            if ch == '\n' {
+                todo!("Return the length of the longest line")
+            }
+            else if let Some(glyph) = self.glyphs.get(&ch) {
+                x += glyph.size.x as f32 + glyph.offset.x as f32 + 1f32;
+            } else {
+                x += 8.0; // Just leave a blank space...
+            }
+        }
+        x
+    }
 }
 
 impl Glyph {

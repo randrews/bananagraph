@@ -46,4 +46,20 @@ impl OnMap {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Player;
+pub struct Player {
+    pub energy: u32,
+    pub health: u32,
+    pub max_health: u32,
+    pub max_energy: u32
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            energy: 0,
+            health: 10,
+            max_energy: 5,
+            max_health: 10
+        }
+    }
+}

@@ -2,6 +2,7 @@ use cgmath::Vector2;
 use hecs::World;
 use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
+use crate::components::Player;
 
 #[derive(Clone)]
 pub struct StatusBar {
@@ -13,9 +14,51 @@ impl StatusBar {
         let mut sprites = Self::frame_sprites();
         let dc = DrawingContext::new((960.0 / 2.0, 544.0 / 2.0));
 
+        // Print the current status line
         if let Some((_, status_bar)) = world.query::<&StatusBar>().into_iter().next() {
             let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 13.0);
-            sprites.append(&mut typeface.print(dc, coord, &status_bar.message.as_str()));
+            sprites.append(&mut typeface.print(dc, coord, status_bar.message.as_str()));
+        }
+
+        if let Some((_, player)) = world.query::<&Player>().into_iter().next() {
+            let energy_icons = (
+                Sprite::new((96, 144), (16, 16)).with_z(0.5).with_layer(3),
+                Sprite::new((64, 144), (16, 16)).with_z(0.5).with_layer(3)
+                );
+
+            let health_icons = (
+                Sprite::new((160, 144), (16, 16)).with_z(0.5).with_layer(3),
+                Sprite::new((144, 144), (16, 16)).with_z(0.5).with_layer(3),
+                Sprite::new((128, 144), (16, 16)).with_z(0.5).with_layer(3)
+            );
+
+            let hleft = typeface.width("Health:");
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 1)) + Vector2::new(0.0, 13.0), "Health:"));
+            let eleft = typeface.width("Energy:");
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 2)) + Vector2::new(0.0, 13.0), "Energy:"));
+            let left = hleft.max(eleft);
+
+            for n in 0u32..player.max_energy {
+                let c = Self::tile_coord((n as i32, 2)) + Vector2::new(left, 0.0);
+                let spr = if n < player.energy {
+                    energy_icons.1
+                } else {
+                    energy_icons.0
+                };
+                sprites.push(dc.place(spr, c))
+            }
+
+            for n in (0u32..player.max_health).step_by(2) {
+                let c = Self::tile_coord((n as i32 / 2, 1)) + Vector2::new(left, 0.0);
+                let spr = if player.health - 2 >= n {
+                    health_icons.2
+                } else if player.health - 1 == n {
+                    health_icons.1
+                } else {
+                    health_icons.0
+                };
+                sprites.push(dc.place(spr, c))
+            }
         }
         // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 0))));
         // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 1))));
