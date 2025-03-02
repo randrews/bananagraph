@@ -5,6 +5,9 @@ use crate::js_gpu_wrapper::JsGpuWrapper;
 
 mod js_gpu_wrapper;
 mod game_state;
+mod components;
+mod terrain;
+mod animation;
 
 #[wasm_bindgen(start)]
 pub fn run() {

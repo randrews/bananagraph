@@ -29,5 +29,7 @@ wgpu = { version="24.0.1", default-features = false, features = ["webgl"] }
 # Needed pro tem to fix the "could not resolve env" bug
 instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 
+hecs = "0.10.5"
+
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
