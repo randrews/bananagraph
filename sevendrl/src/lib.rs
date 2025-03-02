@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-
+use web_sys::js_sys::Math::pow;
 #[cfg(target_arch = "wasm32")]
 use crate::js_gpu_wrapper::JsGpuWrapper;
 
@@ -17,7 +17,7 @@ pub fn run() {
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
-pub async fn init_game(canvas_id: &str) -> JsGpuWrapper {
+pub async fn init_game(canvas_id: &str, seed: f64) -> JsGpuWrapper {
     use web_sys::HtmlCanvasElement;
     use wgpu::SurfaceTarget;
     use bananagraph::{GpuWrapper, WindowEventHandler};
@@ -34,7 +34,7 @@ pub async fn init_game(canvas_id: &str) -> JsGpuWrapper {
         })
         .expect("Failed to init wgpu somehow").await;
 
-    let mut handler = GameState::new();
+    let mut handler = GameState::new((seed * pow(2.0, 32.0)) as u64);
     handler.init(&mut wrapper);
 
     JsGpuWrapper {

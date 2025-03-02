@@ -1,7 +1,7 @@
 use cgmath::Point2;
 use hecs::{Entity, World};
 use bananagraph::Sprite;
-use grid::{Grid, VecGrid};
+use grid::{CellType, Grid, VecGrid};
 use crate::components::OnMap;
 
 /// Walls are immovable terrain that can't be walked through
@@ -14,11 +14,8 @@ pub struct Wall;
 pub struct Terrain;
 
 /// Given a VecGrid<char> of the map, recreates all terrain in the world (after despawning
-/// the preexisting Terrain entities). Looks for a VecGrid containing the following chars:
-/// - `#` for a wall
-/// - `.` for empty floor
-/// - `+` for a door
-pub fn recreate_terrain(map: VecGrid<char>, world: &mut World) {
+/// the preexisting Terrain entities).
+pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
     // Despawn everything that's a Terrain
     let terrain: Vec<Entity> = world.query::<(&Terrain,)>().iter().map(|x| x.0).collect();
     for e in terrain {
@@ -26,14 +23,14 @@ pub fn recreate_terrain(map: VecGrid<char>, world: &mut World) {
     }
 
     // Go over the map creating things
-    for (n, ch) in map.iter().enumerate() {
+    for (n, c) in map.iter().enumerate() {
         let location = map.coord(n);
-        match ch {
-            '#' => {
-                let sprite = wall_tile(map.neighbors_equal(location, '#'));
+        match c {
+            CellType::Wall => {
+                let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
                 world.spawn((Wall, Terrain, OnMap { location, sprite }));
             }
-            '.' => {
+            CellType::Clear | CellType::Door => {
                 let sprite = Sprite::new((144, 128), (16, 16));
                 world.spawn((Terrain, OnMap { location, sprite }));
             },

@@ -2,7 +2,7 @@ import init, { init_game } from '../pkg/sevendrl.js'
 
 document.addEventListener('DOMContentLoaded', () => {
     init().then(async () => {
-        const wrapper = await init_game('main_canvas')
+        const wrapper = await init_game('main_canvas', Math.random())
 
         const handleEvent = (e) => {
             e.preventDefault()

@@ -1,22 +1,18 @@
-use std::iter::Filter;
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
-use hecs::{Entity, Query, QueryIter, World};
+use hecs::{Query, World};
 use log::info;
+use tinyrand::{Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
-use grid::{Coord, Dir, VecGrid};
+use grid::{create_bsp_map, CellType, Coord, Dir, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{OnMap, Player};
 use crate::terrain::{recreate_terrain, Wall};
 
+#[derive(Default)]
 pub struct GameState {
     world: World,
-}
-
-impl Default for GameState {
-    fn default() -> Self {
-        Self { world: World::default() }
-    }
+    rand: Xorshift
 }
 
 impl WindowEventHandler for GameState {
@@ -39,7 +35,12 @@ impl WindowEventHandler for GameState {
 }
 
 impl GameState {
-    pub fn set_map(&mut self, map: VecGrid<char>) {
+    pub fn seed(&mut self, seed: u64) {
+        info!("seed: {}", seed);
+        self.rand = Xorshift::seed(seed)
+    }
+
+    pub fn set_map(&mut self, map: VecGrid<CellType>) {
         recreate_terrain(map, &mut self.world)
     }
 
@@ -79,6 +80,18 @@ impl GameState {
             }).collect()
     }
 
+    // fn find_on_map<'a, Q: Query + 'a>(&'a self, loc: impl Into<Vector2<i32>>) -> Vec<<Q as Query>::Item<'a>> {
+    //     let loc = loc.into();
+    //     self.world.query::<(Q, &OnMap)>().into_iter()
+    //         .filter_map(|(e, (q, on_map))| {
+    //             if on_map.location == loc {
+    //                 Some(q)
+    //             } else {
+    //                 None
+    //             }
+    //         }).collect()
+    // }
+
     fn exists_on_map<Q: Query>(&self, loc: impl Into<Vector2<i32>>) -> bool {
         let loc = loc.into();
         self.world.query::<(Q, &OnMap)>().iter().any(|(_, (_, on_map))| on_map.location == loc)
@@ -100,21 +113,23 @@ impl GameState {
     // Gotta shut clippy up about this because it's only called in a fn that's only visible
     // to wasm32.
     #[allow(dead_code)]
-    pub fn new() -> Self {
-        let map: VecGrid<char> = VecGrid::from([
-            "..........",
-            "..######..",
-            "..#....#..",
-            "..#..###..",
-            "..####.#..",
-            "...#...#..",
-            "...#...#..",
-            "...#####..",
-            "..........",
-            "..........",
-        ].join("\n").as_str());
+    pub fn new(seed: u64) -> Self {
+        // let map: VecGrid<char> = VecGrid::from([
+        //     "..........",
+        //     "..######..",
+        //     "..#....#..",
+        //     "..#..###..",
+        //     "..####.#..",
+        //     "...#...#..",
+        //     "...#...#..",
+        //     "...#####..",
+        //     "..........",
+        //     "..........",
+        // ].join("\n").as_str());
 
         let mut game_state = Self::default();
+        game_state.seed(seed);
+        let map = create_bsp_map((64, 64), 6, &mut game_state.rand);
         game_state.set_map(map);
         game_state.set_player((4, 2));
         game_state
