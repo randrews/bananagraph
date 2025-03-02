@@ -8,6 +8,7 @@ mod components;
 mod terrain;
 mod animation;
 mod door;
+mod status_bar;
 
 #[wasm_bindgen(start)]
 pub fn run() {

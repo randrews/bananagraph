@@ -14,7 +14,7 @@ fn player_loc(world: &World) -> Vector2<i32> {
 
 impl OnMap {
     pub fn system(world: &World) -> Vec<Sprite> {
-        let dc = DrawingContext::new((960.0 / 2.0, 540.0 / 2.0));
+        let dc = DrawingContext::new((960.0 / 2.0, 544.0 / 2.0));
         let mut sprites = vec![];
 
         // We have a 480 x 270 "pixel" area, which with 16x16 tiles means 30x16.875 tiles

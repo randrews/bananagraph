@@ -8,6 +8,7 @@ use grid::{create_bsp_map, CellType, Coord, Dir, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{OnMap, Player};
 use crate::door::Door;
+use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
 
 #[derive(Default)]
@@ -20,10 +21,13 @@ impl WindowEventHandler for GameState {
     fn init(&mut self, wrapper: &mut GpuWrapper) {
         wrapper.add_texture(include_bytes!("Dungeon.png"), Some("Dungeon.png"));
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
+        wrapper.add_texture(include_bytes!("Frames.png"), Some("Frames.png"));
     }
 
     fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
-        wrapper.redraw_with_ids(OnMap::system(&self.world)).ok()
+        let mut sprites = OnMap::system(&self.world);
+        sprites.append(&mut StatusBar::system(&self.world));
+        wrapper.redraw_with_ids(sprites).ok()
     }
 
     fn tick(&mut self, dt: Duration) {
