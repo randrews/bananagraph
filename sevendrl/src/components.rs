@@ -1,6 +1,8 @@
 use cgmath::Vector2;
+use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
 use hecs::World;
 use bananagraph::{DrawingContext, Sprite};
+use crate::terrain::Opaque;
 
 #[derive(Copy, Clone, Debug)]
 pub struct OnMap {
@@ -9,7 +11,7 @@ pub struct OnMap {
 }
 
 fn player_loc(world: &World) -> Vector2<i32> {
-    world.query::<(&Player, &OnMap)>().into_iter().next().map(|(_, (_, onmap))| onmap.location.clone()).unwrap()
+    world.query::<(&Player, &OnMap)>().into_iter().next().map(|(_, (_, onmap))| onmap.location).unwrap()
 }
 
 impl OnMap {
@@ -28,6 +30,10 @@ impl OnMap {
         let size = Vector2::new(21, 13);
         let inv_width = (960.0 / 2.0) - (21.0 * 16.0);
 
+        // First let's do some fov work:
+        let fov_map = map_data_for(world, (64, 64), player_loc);
+        let fog = Sprite::new((80, 64), (16, 16)).with_z(0.7);
+
         for (_, (on_map,)) in world.query::<(&OnMap,)>().iter() {
             let OnMap { location, sprite } = on_map;
             // Skip things not in the region
@@ -39,10 +45,27 @@ impl OnMap {
                 (location.x - topleft.x) as f32 * 16.0 + inv_width,
                 (location.y - topleft.y) as f32 * 16.0
             );
-            sprites.push(dc.place(*sprite, local_coords));
+            sprites.push(dc.place(*sprite, local_coords).with_z(0.8));
+
+            // If this isn't in fov, plant an opaque fog sprite on top of it:
+            if !fov_map.fov[location.x as usize + location.y as usize * 64usize] {
+                sprites.push(dc.place(fog, local_coords))
+            }
         }
         sprites
     }
+}
+
+fn map_data_for(world: &World, size: impl Into<Vector2<usize>>, player_loc: impl Into<Vector2<i32>>) -> MapData {
+    let (player_loc, size) = (player_loc.into(), size.into());
+    let mut map = MapData::new(size.x, size.y);
+
+    for (_, (onmap, opaque)) in world.query::<(&OnMap, Option<&Opaque>)>().into_iter() {
+        let (x, y) = onmap.location.into();
+        map.transparent[x as usize + (y * size.x as i32) as usize] = opaque.is_none()
+    }
+    FovRecursiveShadowCasting::new().compute_fov(&mut map, player_loc.x as usize, player_loc.y as usize, 20, true);
+    map
 }
 
 #[derive(Copy, Clone, Debug)]

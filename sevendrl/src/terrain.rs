@@ -9,6 +9,10 @@ use crate::door::Door;
 #[derive(Copy, Clone, Debug)]
 pub struct Wall;
 
+/// Opaque things block FOV
+#[derive(Copy, Clone, Debug)]
+pub struct Opaque;
+
 /// Terrain is anything that's determined solely from the map generation: walls + floors + doors +
 /// water + etc.
 #[derive(Copy, Clone, Debug)]
@@ -31,7 +35,7 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
                 // Treat walls and doors as equivalent for wall sprites. I may change my mind here later.
                 let sprite = wall_tile(map.for_neighbors(location, |_, c| *c == CellType::Wall || *c == CellType::Door));
                 //let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
-                world.spawn((Wall, Terrain, OnMap { location, sprite }));
+                world.spawn((Wall, Opaque, Terrain, OnMap { location, sprite }));
             }
             CellType::Clear => {
                 let sprite = if (location.x + location.y) % 2 == 0 {
@@ -43,7 +47,7 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
             },
             CellType::Door => {
                 let sprite = Sprite::new((96, 32), (16, 16));
-                world.spawn((Terrain, Door { open: false }, OnMap { location, sprite }));
+                world.spawn((Terrain, Opaque, Door { open: false }, OnMap { location, sprite }));
             }
         }
     }

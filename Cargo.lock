@@ -610,6 +610,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "doryen-fov"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a8e6ef8177b52d581c728655ff05fe03a6634ed496fc2c6642bb17b91d27aa9"
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2154,6 +2160,7 @@ dependencies = [
  "cgmath",
  "console_error_panic_hook",
  "console_log",
+ "doryen-fov",
  "grid",
  "hecs",
  "instant",
