@@ -8,14 +8,36 @@ use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
+use crate::game_state::GameMode::IntroModal;
+use crate::modal::{ContentType, DismissType, Modal};
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
+
+pub enum GameMode {
+    IntroModal, // The "intro" modal is up, we must press something to close it
+    HelpModal, // The "help" modal is up
+    Play, // Normal play, arrow keys and abilities
+}
+
+enum KeyPress<'a> {
+    Enter,
+    Esc,
+    Letter(&'a str),
+    Arrow(Dir),
+}
+
+impl Default for GameMode {
+    fn default() -> Self {
+        IntroModal
+    }
+}
 
 #[derive(Default)]
 pub struct GameState {
     pub(crate) world: World,
     pub(crate) rand: Xorshift,
-    pub(crate) typeface: Option<Typeface>
+    pub(crate) typeface: Option<Typeface>,
+    pub(crate) game_mode: GameMode
 }
 
 impl WindowEventHandler for GameState {
@@ -25,6 +47,7 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("Frames.png"), Some("Frames.png"));
         wrapper.add_texture(include_bytes!("Icons.png"), Some("Icons.png"));
         wrapper.add_texture(include_bytes!("Monsters-Animated.png"), Some("Monsters-Animated.png"));
+        wrapper.add_texture(include_bytes!("Items.png"), Some("Items.png"));
 
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
         builder.add_glyphs("ABCDEFGH", (7, 15), (1, 1), Some(1));
@@ -48,6 +71,7 @@ impl WindowEventHandler for GameState {
 
         builder.set_x_offset('p', -3);
         builder.set_x_offset('j', -3);
+        builder.set_right_offset('q', -3);
         builder.add_sized_glyph(' ', (3, 1), (17, 113));
         self.typeface = Some(builder.into_typeface(wrapper));
     }
@@ -55,6 +79,7 @@ impl WindowEventHandler for GameState {
     fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let mut sprites = OnMap::system(&self.world);
         sprites.append(&mut StatusBar::system(&self.world, self.typeface.as_ref().unwrap()));
+        sprites.append(&mut Modal::system(&self.world, self.typeface.as_ref().unwrap()));
         wrapper.redraw_with_ids(sprites).ok()
     }
 
@@ -62,12 +87,44 @@ impl WindowEventHandler for GameState {
         BreatheAnimation::system(&mut self.world, dt)
     }
 
+    fn letter_key(&mut self, letter: &str) {
+        self.handle_key(KeyPress::Letter(letter))
+    }
+
+    fn enter_key(&mut self) {
+        self.handle_key(KeyPress::Enter)
+    }
+
+    fn esc_key(&mut self) {
+        self.handle_key(KeyPress::Esc)
+    }
+
     fn arrow_key(&mut self, dir: bananagraph::Dir) {
-        self.walk(convert_dir(dir))
+        self.handle_key(KeyPress::Arrow(convert_dir(dir)))
     }
 }
 
 impl GameState {
+    pub fn handle_key(&mut self, key: KeyPress) {
+        // if a modal is up, that gets first crack:
+        if let Some((ent, (modal))) = self.world.query_mut::<&Modal>().into_iter().next() {
+            // We pressed something, kill it.
+            if modal.dismiss == DismissType::Any {
+                self.world.despawn(ent).unwrap()
+            }
+        } else {
+            match key {
+                KeyPress::Letter("?") => {
+                    self.create_help_modal()
+                }
+                KeyPress::Arrow(dir) => {
+                    self.walk(dir)
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn seed(&mut self, seed: u64) {
         info!("seed: {}", seed);
         self.rand = Xorshift::seed(seed)
@@ -123,7 +180,7 @@ impl GameState {
     }
 
     pub fn create_status_bar(&mut self) {
-        self.world.spawn((StatusBar { message: String::from("Welcome!") },));
+        self.world.spawn((StatusBar { message: String::from("Welcome! Press ? for help.") },));
     }
 
     fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
@@ -174,7 +231,48 @@ impl GameState {
         game_state.set_map(map);
         game_state.set_player((4, 2));
         game_state.create_status_bar();
+        game_state.create_intro_modal();
         game_state
+    }
+
+    fn create_intro_modal(&mut self) {
+        self.world.spawn((Modal::new((15, 9), vec![
+            ContentType::Center(String::from("Welcome, Adventurer!")),
+            ContentType::Text(["You aspire to be one of the fabled Monks of",
+                "Sevendral! To prove your honor to the order,",
+                "you are to search this dungeon for the fabled",
+                "Amulet of Sevendral, which some careless",
+                "butterfingers apparently dropped down here.",
+                "",
+                "Good luck!"].join("\n")),
+            ContentType::Center(String::from("-= press any key =-")),
+        ], DismissType::Any),));
+    }
+
+    fn create_help_modal(&mut self) {
+        self.world.spawn((Modal::new((25, 15), vec![
+            ContentType::Center(String::from("How to play")),
+            ContentType::Text([
+                "- Use arrow keys to walk through the dungeon. Like all Monks of Sevendral,",
+                "  you have taken a solemn vow never to move diagonally (your enemies, of",
+                "  course, can and will, as they lack honor).",
+                "",
+                "- Move toward enemies from two spaces away to attack. Each one you slay",
+                "  increases your energy focus, which can be used to perform abilities.",
+            ].join("\n")),
+            ContentType::CenterSprite(Sprite::new((154, 0), (48, 32)).with_layer(2)),
+            ContentType::Text([
+                "- Ability scrolls allow special moves and combos. Activate equipped abilities",
+                "  with [1], [2], or [3]"
+            ].join("\n")),
+            ContentType::CenterSprite(Sprite::new((64, 112), (16, 16)).with_layer(5)),
+            ContentType::Text([
+                "- You can carry other items in your inventory and activate them with other",
+                "  keys.",
+                ""
+            ].join("\n")),
+            ContentType::Center(String::from("-= press any key =-")),
+        ], DismissType::Any),));
     }
 }
 

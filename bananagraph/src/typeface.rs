@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use cgmath::{Point2, Vector2};
 use image::{DynamicImage, GenericImage, GenericImageView};
+use log::info;
 use crate::{DrawingContext, GpuWrapper, Sprite};
 
 pub struct TypefaceBuilder {
@@ -22,7 +23,7 @@ pub struct TypefaceBuilder {
 #[derive(Clone)]
 pub struct Typeface {
     pub(crate) glyphs: BTreeMap<char, Glyph>,
-    height: u32
+    pub height: u32
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -32,6 +33,10 @@ pub struct Glyph {
 
     /// The amount we need to shift the character to account for baseline
     pub offset: Vector2<i32>,
+
+    /// If present, this will be added to the width the char takes up in printing. A
+    /// negative one will allow the char to the right to overlap this one.
+    pub right_offset: Option<i32>,
 
     /// The actual size of the glyph
     pub size: Vector2<u32>
@@ -95,7 +100,8 @@ impl TypefaceBuilder {
         let glyph = Glyph {
             sprite: Sprite::new(topleft, size),
             offset: (0, self.baseline as i32 - size.y as i32).into(),
-            size: (1 + right as u32, (bottom - top) as u32).into()
+            size: (1 + right as u32, (bottom - top) as u32).into(),
+            right_offset: None
         };
 
         self.glyphs.insert(ch, glyph);
@@ -109,6 +115,7 @@ impl TypefaceBuilder {
         let glyph = Glyph {
             sprite: Sprite::new(topleft, size),
             offset: (0, self.baseline as i32 - size.y as i32).into(),
+            right_offset: None,
             size
         };
 
@@ -118,6 +125,12 @@ impl TypefaceBuilder {
     pub fn set_x_offset(&mut self, ch: char, offset: i32) {
         if let Some(glyph) = self.glyphs.get_mut(&ch) {
             glyph.offset.x = offset
+        }
+    }
+
+    pub fn set_right_offset(&mut self, ch: char, offset: i32) {
+        if let Some(glyph) = self.glyphs.get_mut(&ch) {
+            glyph.right_offset = Some(offset)
         }
     }
 
@@ -143,22 +156,22 @@ impl TypefaceBuilder {
 }
 
 impl Typeface {
-    pub fn print<'a>(&self, dc: DrawingContext, at: impl Into<Vector2<f32>>, s: impl Into<&'a str>) -> Vec<Sprite> {
+    pub fn print<'a>(&self, dc: DrawingContext, at: impl Into<Vector2<f32>>, z: f32, s: impl Into<&'a str>) -> Vec<Sprite> {
         let mut sprites = vec![];
         let mut x = 0f32;
         let mut at = at.into();
         for ch in s.into().chars() {
             if ch == '\n' {
-                x = at.x;
+                x = 0.0;
                 at.y += self.height as f32 + 1f32;
             }
             else if let Some(glyph) = self.glyphs.get(&ch) {
-                let sprite = dc.place(glyph.sprite, (
+                let sprite = dc.place(glyph.sprite.with_z(z), (
                     at.x + x + glyph.offset.x as f32,
                     at.y + glyph.offset.y as f32
                 ));
                 sprites.push(sprite);
-                x += glyph.size.x as f32 + glyph.offset.x as f32 + 1f32;
+                x += glyph.size.x as f32 + glyph.offset.x as f32 + 1f32 + glyph.right_offset.unwrap_or(0) as f32;
             } else {
                 x += 8.0; // Just leave a blank space...
             }
@@ -234,7 +247,7 @@ mod tests {
         builder.add_glyphs("abcdefgh", (7, 15), (1, 65), Some(1));
         builder.add_glyphs("ijklmnop", (7, 15), (1, 81), Some(1));
         let tf: Typeface = builder.into_typeface(&mut TestGpu {});
-        let sprites = tf.print(dc, (0.0, 50.0), "foo");
+        let sprites = tf.print(dc, (0.0, 50.0), 0.0,"foo");
         assert_eq!(sprites.len(), 3);
     }
 }

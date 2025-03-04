@@ -17,7 +17,7 @@ impl StatusBar {
         // Print the current status line
         if let Some((_, status_bar)) = world.query::<&StatusBar>().into_iter().next() {
             let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 13.0);
-            sprites.append(&mut typeface.print(dc, coord, status_bar.message.as_str()));
+            sprites.append(&mut typeface.print(dc, coord, 0.3, status_bar.message.as_str()));
         }
 
         if let Some((_, player)) = world.query::<&Player>().into_iter().next() {
@@ -33,9 +33,9 @@ impl StatusBar {
             );
 
             let hleft = typeface.width("Health:");
-            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 1)) + Vector2::new(0.0, 13.0), "Health:"));
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 1)) + Vector2::new(0.0, 13.0), 0.3, "Health:"));
             let eleft = typeface.width("Energy:");
-            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 2)) + Vector2::new(0.0, 13.0), "Energy:"));
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 2)) + Vector2::new(0.0, 13.0), 0.3, "Energy:"));
             let left = hleft.max(eleft);
 
             for n in 0u32..player.max_energy {
@@ -60,9 +60,6 @@ impl StatusBar {
                 sprites.push(dc.place(spr, c))
             }
         }
-        // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 0))));
-        // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 1))));
-        // sprites.push(dc.place(Sprite::new((16, 128), (16, 16)), Self::tile_coord((0, 2))));
         sprites
     }
 

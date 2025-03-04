@@ -9,6 +9,7 @@ mod terrain;
 mod animation;
 mod door;
 mod status_bar;
+mod modal;
 
 #[wasm_bindgen(start)]
 pub fn run() {
