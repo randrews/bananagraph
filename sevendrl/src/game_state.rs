@@ -8,16 +8,9 @@ use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::BreatheAnimation;
 use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
-use crate::game_state::GameMode::IntroModal;
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
-
-pub enum GameMode {
-    IntroModal, // The "intro" modal is up, we must press something to close it
-    HelpModal, // The "help" modal is up
-    Play, // Normal play, arrow keys and abilities
-}
 
 enum KeyPress<'a> {
     Enter,
@@ -26,18 +19,11 @@ enum KeyPress<'a> {
     Arrow(Dir),
 }
 
-impl Default for GameMode {
-    fn default() -> Self {
-        IntroModal
-    }
-}
-
 #[derive(Default)]
 pub struct GameState {
     pub(crate) world: World,
     pub(crate) rand: Xorshift,
     pub(crate) typeface: Option<Typeface>,
-    pub(crate) game_mode: GameMode
 }
 
 impl WindowEventHandler for GameState {
@@ -105,9 +91,9 @@ impl WindowEventHandler for GameState {
 }
 
 impl GameState {
-    pub fn handle_key(&mut self, key: KeyPress) {
+    fn handle_key(&mut self, key: KeyPress) {
         // if a modal is up, that gets first crack:
-        if let Some((ent, (modal))) = self.world.query_mut::<&Modal>().into_iter().next() {
+        if let Some((ent, modal)) = self.world.query_mut::<&Modal>().into_iter().next() {
             // We pressed something, kill it.
             if modal.dismiss == DismissType::Any {
                 self.world.despawn(ent).unwrap()

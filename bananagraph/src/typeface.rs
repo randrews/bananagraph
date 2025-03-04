@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use cgmath::{Point2, Vector2};
 use image::{DynamicImage, GenericImage, GenericImageView};
-use log::info;
 use crate::{DrawingContext, GpuWrapper, Sprite};
 
 pub struct TypefaceBuilder {

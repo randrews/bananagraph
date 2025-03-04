@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use hecs::World;
-use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 
 #[derive(Clone, Debug, PartialEq)]
