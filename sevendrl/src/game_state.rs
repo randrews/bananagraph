@@ -189,6 +189,18 @@ impl GameState {
             }).collect()
     }
 
+    fn find_entities_on_map<Q: Query>(&self, loc: impl Into<Vector2<i32>>) -> Vec<Entity> {
+        let loc = loc.into();
+        self.world.query::<(Q, &OnMap)>().into_iter()
+            .filter_map(|(e, (q, on_map))| {
+                if on_map.location == loc {
+                    Some(e)
+                } else {
+                    None
+                }
+            }).collect()
+    }
+
     fn exists_on_map<Q: Query>(&self, loc: impl Into<Vector2<i32>>) -> bool {
         let loc = loc.into();
         self.world.query::<(Q, &OnMap)>().iter().any(|(_, (_, on_map))| on_map.location == loc)
@@ -206,12 +218,24 @@ impl GameState {
         // First check for walls:
         if self.exists_on_map::<&Wall>(new_loc) { return }
 
+        // Check for enemies:
+        if self.exists_on_map::<&Enemy>(new_loc) { return }
+
         // Now bump doors:
         let can_move = Door::try_move(self, new_loc);
 
         // If all the bumps let us through, actually move:
         if can_move {
             self.get_player::<&mut OnMap>().location = new_loc;
+
+            // If there's an enemy in the space beyond our new_loc, splat it:
+            let beyond = new_loc.translate(dir);
+            if let Some(ent) = self.find_entities_on_map::<&Enemy>(beyond).first() {
+                self.world.despawn(*ent).unwrap();
+                if let Some((_, mut player)) = self.world.query_mut::<&mut Player>().into_iter().next() {
+                    player.energy = (player.energy + 1).min(player.max_energy)
+                }
+            }
         }
     }
 
