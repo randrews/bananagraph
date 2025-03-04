@@ -19,6 +19,14 @@ impl BreatheAnimation {
         }
     }
 
+    pub fn new_with_start(frames: Vec<Sprite>, start: Duration) -> Self {
+        Self {
+            frames,
+            rate: Duration::from_millis(200),
+            timer: start
+        }
+    }
+
     pub fn current_frame(&self) -> Sprite {
         let total = self.frames.len() * self.rate.as_millis() as usize;
         let t = self.timer.as_millis() as usize % total;

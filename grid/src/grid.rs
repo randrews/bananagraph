@@ -156,6 +156,16 @@ pub trait Grid {
     fn find_all<'a, F: Fn(&Self::CellType) -> bool + 'a>(&'a self, test: F) -> impl Iterator<Item=Vector2<i32>> {
         self.size().iter().filter(move |c| test(self.get(*c).unwrap()))
     }
+
+    /// Takes a function that returns a random number and a filter fn that a given cell must satisfy, returns a random
+    /// cell that satisfies the filter
+    fn random_satisfying<F: Fn(Vector2<i32>) -> bool, R: FnMut() -> usize>(&self, mut rand: R, filter: F) -> Vector2<i32> {
+        let (w, h) = self.size().into();
+        loop {
+            let c = self.coord(rand() % (w * h) as usize);
+            if filter(c) { return c }
+        }
+    }
 }
 
 /// A trait that can be applied to any `Grid` to represent mutating cells in the grid.

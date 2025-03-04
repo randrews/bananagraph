@@ -2,11 +2,11 @@ use std::time::Duration;
 use cgmath::{Point2, Vector2};
 use hecs::{Entity, Query, World};
 use log::info;
-use tinyrand::{Seeded, Xorshift};
+use tinyrand::{Rand, Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
-use grid::{create_bsp_map, CellType, Coord, Dir, VecGrid};
+use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::BreatheAnimation;
-use crate::components::{OnMap, Player};
+use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
@@ -24,6 +24,7 @@ impl WindowEventHandler for GameState {
         wrapper.add_texture(include_bytes!("Heroes-Animated.png"), Some("Heroes-Animated.png"));
         wrapper.add_texture(include_bytes!("Frames.png"), Some("Frames.png"));
         wrapper.add_texture(include_bytes!("Icons.png"), Some("Icons.png"));
+        wrapper.add_texture(include_bytes!("Monsters-Animated.png"), Some("Monsters-Animated.png"));
 
         let mut builder = TypefaceBuilder::new(include_bytes!("Curly-Girly.png"), [0, 0, 0, 0xff], 4, 13);
         builder.add_glyphs("ABCDEFGH", (7, 15), (1, 1), Some(1));
@@ -73,7 +74,8 @@ impl GameState {
     }
 
     pub fn set_map(&mut self, map: VecGrid<CellType>) {
-        recreate_terrain(map, &mut self.world)
+        self.spawn_enemies(&map, 500);
+        recreate_terrain(map, &mut self.world);
     }
 
     pub fn set_player(&mut self, location: impl Into<Vector2<i32>>) {
@@ -98,6 +100,26 @@ impl GameState {
             OnMap { location, sprite: frames[0] },
             BreatheAnimation::new(frames)
         ));
+    }
+
+    pub fn spawn_enemies(&mut self, map: &VecGrid<CellType>, count: u32) {
+        let frames = [
+            Sprite::new((64, 16), (16, 16)).with_layer(4),
+            Sprite::new((80, 16), (16, 16)).with_layer(4),
+            Sprite::new((96, 16), (16, 16)).with_layer(4),
+            Sprite::new((96, 16), (16, 16)).with_layer(4),
+            Sprite::new((96, 16), (16, 16)).with_layer(4),
+            Sprite::new((80, 16), (16, 16)).with_layer(4)
+        ];
+
+        for _ in 0..count {
+            let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear);
+            self.world.spawn((
+                Enemy {},
+                OnMap { sprite: frames[0], location: loc },
+                BreatheAnimation::new_with_start(frames.to_vec(), Duration::from_millis(self.rand.next_u64()))
+            ));
+        }
     }
 
     pub fn create_status_bar(&mut self) {
