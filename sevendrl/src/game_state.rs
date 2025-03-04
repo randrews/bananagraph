@@ -1,3 +1,4 @@
+use std::collections::{BTreeSet, HashSet};
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
 use hecs::{Entity, Query, World};
@@ -155,13 +156,20 @@ impl GameState {
             Sprite::new((80, 16), (16, 16)).with_layer(4)
         ];
 
+        // Delete the old enemies
+        let ents = self.world.query_mut::<&Enemy>().into_iter().map(|(e, _)| e).collect::<Vec<_>>();
+        for e in ents { self.world.despawn(e).unwrap() }
+
+        // A set of every place we've spawned an enemy
+        let mut enemy_locs = HashSet::new();
         for _ in 0..count {
-            let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear);
+            let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear && !enemy_locs.contains(&c));
             self.world.spawn((
                 Enemy {},
                 OnMap { sprite: frames[0], location: loc },
                 BreatheAnimation::new_with_start(frames.to_vec(), Duration::from_millis(self.rand.next_u64()))
             ));
+            enemy_locs.insert(loc);
         }
     }
 
