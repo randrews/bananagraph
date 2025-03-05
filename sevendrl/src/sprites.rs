@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 use bananagraph::{DrawingContext, Sprite};
 use crate::sprites::AnimationSprites::{Enemy1, Enemy2, Enemy3};
+use crate::sprites::Items::HealthPotion;
 
 pub trait SpriteFor {
     fn sprite(&self) -> Sprite;
@@ -123,5 +124,31 @@ impl UiFrame {
         }
 
         sprites
+    }
+}
+
+pub enum Items {
+    HealthPotion,
+}
+
+impl SpriteFor for Items {
+    fn sprite(&self) -> Sprite {
+        use Items::*;
+        match self {
+            HealthPotion => Sprite::new((0, 0), (16, 16)).with_layer(5),
+        }
+    }
+}
+
+pub enum MapCells {
+    Fog,
+}
+
+impl SpriteFor for MapCells {
+    fn sprite(&self) -> Sprite {
+        use MapCells::*;
+        match self {
+            Fog => Sprite::new((80, 64), (16, 16)),
+        }
     }
 }

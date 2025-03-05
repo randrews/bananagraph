@@ -2,6 +2,7 @@ use cgmath::Vector2;
 use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
 use hecs::World;
 use bananagraph::{DrawingContext, Sprite};
+use crate::sprites::{MapCells, SpriteFor};
 use crate::terrain::Opaque;
 
 #[derive(Copy, Clone, Debug)]
@@ -32,7 +33,7 @@ impl OnMap {
 
         // First let's do some fov work:
         let fov_map = map_data_for(world, (64, 64), player_loc);
-        let fog = Sprite::new((80, 64), (16, 16)).with_z(0.7);
+        let fog = MapCells::Fog.sprite().with_z(0.7);
 
         for (_, (on_map,)) in world.query::<(&OnMap,)>().iter() {
             let OnMap { location, sprite } = on_map;

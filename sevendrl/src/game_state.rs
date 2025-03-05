@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
-use hecs::{Entity, Query, World};
+use hecs::{DynamicBundle, Entity, Query, World};
 use log::info;
 use tinyrand::{Rand, Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
@@ -9,9 +9,9 @@ use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
-use crate::inventory::Inventory;
+use crate::inventory::{activate_item, inventory_item_for_key, next_inventory_idx, next_inventory_key, HealthPotion, Inventory, InventoryItem};
 use crate::modal::{ContentType, DismissType, Modal};
-use crate::sprites::{AnimationSprites, SpriteFor};
+use crate::sprites::{AnimationSprites, Items, SpriteFor};
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
 
@@ -117,6 +117,12 @@ impl GameState {
                 KeyPress::Arrow(dir) => {
                     self.walk(dir)
                 }
+                KeyPress::Letter(s) => {
+                    let c = s.chars().next().unwrap();
+                    if let Some(ent) = inventory_item_for_key(&self.world, c) {
+                        activate_item(&mut self.world, ent);
+                    }
+                }
                 _ => {}
             }
         }
@@ -170,6 +176,18 @@ impl GameState {
 
     pub fn create_inventory(&mut self) {
         self.world.spawn((Inventory {},));
+        let i = self.add_to_inventory("Potion", Items::HealthPotion.sprite());
+        let _ = self.world.insert(i, (HealthPotion {},));
+    }
+
+    pub fn add_to_inventory(&mut self, name: &str, sprite: Sprite) -> Entity {
+        let inv = InventoryItem {
+            name: String::from(name),
+            sprite,
+            index: next_inventory_idx(&self.world),
+            key: Some(next_inventory_key(&self.world))
+        };
+        self.world.spawn((inv,))
     }
 
     fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
