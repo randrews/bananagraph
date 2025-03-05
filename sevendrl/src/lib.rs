@@ -10,6 +10,7 @@ mod animation;
 mod door;
 mod status_bar;
 mod modal;
+mod sprites;
 
 #[wasm_bindgen(start)]
 pub fn run() {

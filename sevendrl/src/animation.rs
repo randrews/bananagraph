@@ -40,3 +40,42 @@ impl BreatheAnimation {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct OneShotAnimation {
+    frames: Vec<Sprite>,
+    rate: Duration,
+    timer: Duration
+}
+
+impl OneShotAnimation {
+    pub fn new(frames: Vec<Sprite>) -> Self {
+        Self {
+            frames,
+            rate: Duration::from_millis(120),
+            timer: Duration::from_millis(0)
+        }
+    }
+
+    pub fn current_frame(&self) -> Option<Sprite> {
+        let t = self.timer.as_millis() as usize;
+        let idx = t / self.rate.as_millis() as usize;
+        self.frames.get(idx).map(|f| *f)
+    }
+
+    pub fn system(world: &mut World, dt: Duration) {
+        let mut graveyard = vec![];
+        for (ent, (anim, on_map)) in world.query_mut::<(&mut OneShotAnimation, &mut OnMap)>() {
+            anim.timer += dt;
+            if let Some(frame) = anim.current_frame() {
+                on_map.sprite = frame;
+            } else {
+                graveyard.push(ent);
+            }
+        }
+
+        for e in graveyard.into_iter() {
+            world.despawn(e).unwrap()
+        }
+    }
+}

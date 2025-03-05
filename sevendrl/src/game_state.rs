@@ -6,10 +6,11 @@ use log::info;
 use tinyrand::{Rand, Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
-use crate::animation::BreatheAnimation;
+use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
 use crate::modal::{ContentType, DismissType, Modal};
+use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Wall};
 
@@ -71,7 +72,8 @@ impl WindowEventHandler for GameState {
     }
 
     fn tick(&mut self, dt: Duration) {
-        BreatheAnimation::system(&mut self.world, dt)
+        BreatheAnimation::system(&mut self.world, dt);
+        OneShotAnimation::system(&mut self.world, dt);
     }
 
     fn letter_key(&mut self, letter: &str) {
@@ -100,6 +102,11 @@ impl GameState {
                 self.world.despawn(ent).unwrap()
             }
         } else {
+            // First, is there a one-shot animation going? Let's ignore input until it finishes:
+            if self.world.query::<&OneShotAnimation>().iter().next().is_some() {
+                return
+            }
+
             match key {
                 KeyPress::Letter("?") => {
                     self.create_help_modal()
@@ -128,34 +135,15 @@ impl GameState {
         let player = self.world.query::<&Player>().iter().map(|(e, _)| e).next();
         player.map(|e| self.world.despawn(e));
 
-        // Player animation frames
-        let frames = vec![
-            Sprite::new((0, 0), (16, 16)).with_layer(1),
-            Sprite::new((16, 0), (16, 16)).with_layer(1),
-            Sprite::new((32, 0), (16, 16)).with_layer(1),
-            Sprite::new((32, 0), (16, 16)).with_layer(1),
-            Sprite::new((32, 0), (16, 16)).with_layer(1),
-            Sprite::new((16, 0), (16, 16)).with_layer(1)
-        ];
-
         // Spawn a new player
         self.world.spawn((
             Player::default(),
-            OnMap { location, sprite: frames[0] },
-            BreatheAnimation::new(frames)
+            OnMap { location, sprite: AnimationSprites::Player1.sprite() },
+            BreatheAnimation::new(AnimationSprites::player_breathe())
         ));
     }
 
     pub fn spawn_enemies(&mut self, map: &VecGrid<CellType>, count: u32) {
-        let frames = [
-            Sprite::new((64, 16), (16, 16)).with_layer(4),
-            Sprite::new((80, 16), (16, 16)).with_layer(4),
-            Sprite::new((96, 16), (16, 16)).with_layer(4),
-            Sprite::new((96, 16), (16, 16)).with_layer(4),
-            Sprite::new((96, 16), (16, 16)).with_layer(4),
-            Sprite::new((80, 16), (16, 16)).with_layer(4)
-        ];
-
         // Delete the old enemies
         let ents = self.world.query_mut::<&Enemy>().into_iter().map(|(e, _)| e).collect::<Vec<_>>();
         for e in ents { self.world.despawn(e).unwrap() }
@@ -166,8 +154,8 @@ impl GameState {
             let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear && !enemy_locs.contains(&c));
             self.world.spawn((
                 Enemy {},
-                OnMap { sprite: frames[0], location: loc },
-                BreatheAnimation::new_with_start(frames.to_vec(), Duration::from_millis(self.rand.next_u64()))
+                OnMap { sprite: AnimationSprites::Enemy1.sprite(), location: loc },
+                BreatheAnimation::new_with_start(AnimationSprites::enemy_breathe(), Duration::from_millis(self.rand.next_u64()))
             ));
             enemy_locs.insert(loc);
         }
@@ -231,10 +219,16 @@ impl GameState {
             // If there's an enemy in the space beyond our new_loc, splat it:
             let beyond = new_loc.translate(dir);
             if let Some(ent) = self.find_entities_on_map::<&Enemy>(beyond).first() {
-                self.world.despawn(*ent).unwrap();
+                self.world.despawn(*ent).unwrap(); // Kill the enemy
+                // Give the player some energy as a reward
                 if let Some((_, mut player)) = self.world.query_mut::<&mut Player>().into_iter().next() {
                     player.energy = (player.energy + 1).min(player.max_energy)
                 }
+                // Spawn a one-shot showing the enemy fading
+                self.world.spawn((
+                    OneShotAnimation::new(AnimationSprites::enemy_fade()),
+                    OnMap { location: beyond, sprite: AnimationSprites::EnemyFade1.sprite() }
+                    ));
             }
         }
     }
