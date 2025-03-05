@@ -52,7 +52,7 @@ impl OneShotAnimation {
     pub fn new(frames: Vec<Sprite>) -> Self {
         Self {
             frames,
-            rate: Duration::from_millis(120),
+            rate: Duration::from_millis(80),
             timer: Duration::from_millis(0)
         }
     }

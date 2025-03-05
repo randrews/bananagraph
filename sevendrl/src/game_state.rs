@@ -9,6 +9,7 @@ use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{Enemy, OnMap, Player};
 use crate::door::Door;
+use crate::inventory::Inventory;
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::StatusBar;
@@ -66,8 +67,10 @@ impl WindowEventHandler for GameState {
 
     fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let mut sprites = OnMap::system(&self.world);
-        sprites.append(&mut StatusBar::system(&self.world, self.typeface.as_ref().unwrap()));
-        sprites.append(&mut Modal::system(&self.world, self.typeface.as_ref().unwrap()));
+        let tf = self.typeface.as_ref().unwrap();
+        sprites.append(&mut StatusBar::system(&self.world, tf));
+        sprites.append(&mut Inventory::system(&self.world, tf));
+        sprites.append(&mut Modal::system(&self.world, tf));
         wrapper.redraw_with_ids(sprites).ok()
     }
 
@@ -165,6 +168,10 @@ impl GameState {
         self.world.spawn((StatusBar { message: String::from("Welcome! Press ? for help.") },));
     }
 
+    pub fn create_inventory(&mut self) {
+        self.world.spawn((Inventory {},));
+    }
+
     fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
         let loc = loc.into();
         self.world.query_mut::<(Q, &OnMap)>().into_iter()
@@ -243,6 +250,7 @@ impl GameState {
         game_state.set_map(map);
         game_state.set_player((4, 2));
         game_state.create_status_bar();
+        game_state.create_inventory();
         game_state.create_intro_modal();
         game_state
     }

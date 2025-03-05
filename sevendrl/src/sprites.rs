@@ -1,10 +1,12 @@
-use bananagraph::Sprite;
+use cgmath::Vector2;
+use bananagraph::{DrawingContext, Sprite};
 use crate::sprites::AnimationSprites::{Enemy1, Enemy2, Enemy3};
 
 pub trait SpriteFor {
     fn sprite(&self) -> Sprite;
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AnimationSprites {
     Player1, // Player animation frames
     Player2,
@@ -66,5 +68,60 @@ impl SpriteFor for AnimationSprites {
             EnemyFade2 => Sprite::new((144, 96), (16, 16)).with_layer(4),
             EnemyFade3 => Sprite::new((160, 96), (16, 16)).with_layer(4),
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum UiFrame {
+    NwCorner,
+    NeCorner,
+    SeCorner,
+    SwCorner,
+    NEdge,
+    EEdge,
+    SEdge,
+    WEdge,
+    Middle
+}
+
+impl SpriteFor for UiFrame {
+    fn sprite(&self) -> Sprite {
+        use UiFrame::*;
+        match self {
+            NwCorner => Sprite::new((54, 134), (16, 16)).with_z(0.9).with_layer(2),
+            NeCorner => Sprite::new((90, 134), (16, 16)).with_z(0.9).with_layer(2),
+            SeCorner => Sprite::new((54, 171), (16, 16)).with_z(0.9).with_layer(2),
+            SwCorner => Sprite::new((90, 171), (16, 16)).with_z(0.9).with_layer(2),
+            NEdge => Sprite::new((70, 134), (16, 16)).with_z(0.9).with_layer(2),
+            EEdge => Sprite::new((90, 150), (16, 16)).with_z(0.9).with_layer(2),
+            SEdge => Sprite::new((74, 171), (16, 16)).with_z(0.9).with_layer(2),
+            WEdge => Sprite::new((54, 150), (16, 16)).with_z(0.9).with_layer(2),
+            Middle => Sprite::new((16, 144), (16, 16)).with_z(0.9).with_layer(2)
+        }
+    }
+}
+
+impl UiFrame {
+    pub fn draw_frame(dc: DrawingContext, topleft: impl Into<Vector2<f32>>, tile_size: impl Into<Vector2<i32>>, z: f32) -> Vec<Sprite> {
+        let (topleft, size) = (topleft.into(), tile_size.into());
+        use UiFrame::*;
+        let mut sprites = vec![];
+
+        for y in 0..size.y {
+            for x in 0..size.x {
+                let spr = if (x, y) == (0, 0) { NwCorner }
+                else if (x, y) == (size.x - 1, 0) { NeCorner }
+                else if (x, y) == (0, size.y - 1) { SeCorner }
+                else if (x, y) == (size.x - 1, size.y - 1) { SwCorner }
+                else if y == 0 { NEdge }
+                else if x == size.x - 1 { EEdge }
+                else if y == size.y - 1 { SEdge }
+                else if x == 0 { WEdge }
+                else { Middle };
+                sprites.push(dc.place(spr.sprite().with_z(z), Vector2::new(x as f32, y as f32) * 16.0 + topleft));
+            }
+        }
+
+        sprites
     }
 }

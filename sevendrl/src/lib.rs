@@ -11,6 +11,7 @@ mod door;
 mod status_bar;
 mod modal;
 mod sprites;
+mod inventory;
 
 #[wasm_bindgen(start)]
 pub fn run() {
