@@ -87,6 +87,3 @@ impl Default for Player {
         }
     }
 }
-
-#[derive(Copy, Clone, Debug)]
-pub struct Enemy {}

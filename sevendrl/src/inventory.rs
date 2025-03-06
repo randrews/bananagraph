@@ -73,12 +73,18 @@ pub fn activate_item(world: &mut World, item: Entity) {
 
     // If it's a health pot:
     if let Some(_) = result.0 {
-        let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
-        player.health = player.max_health.min(player.health + 3);
-        world.despawn(item).unwrap();
-        set_message(world, "Drank health potion")
+        HealthPotion::activate(world, item)
     }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct HealthPotion {}
+
+impl HealthPotion {
+    fn activate(world: &mut World, entity: Entity) {
+        let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
+        player.health = player.max_health.min(player.health + 3);
+        world.despawn(entity).unwrap();
+        set_message(world, "Drank health potion");
+    }
+}

@@ -5,9 +5,14 @@ use grid::{CellType, Grid, VecGrid};
 use crate::components::OnMap;
 use crate::door::Door;
 
-/// Walls are immovable terrain that can't be walked through
+// /// Walls are immovable terrain
+// #[derive(Copy, Clone, Debug)]
+// pub struct Wall;
+
+/// Solid is a trait that means something can't be walked through. Walls are created solid,
+/// closed doors are solid, etc.
 #[derive(Copy, Clone, Debug)]
-pub struct Wall;
+pub struct Solid;
 
 /// Opaque things block FOV
 #[derive(Copy, Clone, Debug)]
@@ -35,7 +40,7 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
                 // Treat walls and doors as equivalent for wall sprites. I may change my mind here later.
                 let sprite = wall_tile(map.for_neighbors(location, |_, c| *c == CellType::Wall || *c == CellType::Door));
                 //let sprite = wall_tile(map.neighbors_equal(location, CellType::Wall));
-                world.spawn((Wall, Opaque, Terrain, OnMap { location, sprite }));
+                world.spawn((Solid, Opaque, Terrain, OnMap { location, sprite }));
             }
             CellType::Clear => {
                 let sprite = if (location.x + location.y) % 2 == 0 {
@@ -47,7 +52,7 @@ pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
             },
             CellType::Door => {
                 let sprite = Sprite::new((96, 32), (16, 16));
-                world.spawn((Terrain, Opaque, Door { open: false }, OnMap { location, sprite }));
+                world.spawn((Terrain, Solid, Opaque, Door { open: false }, OnMap { location, sprite }));
             }
         }
     }

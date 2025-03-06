@@ -12,6 +12,7 @@ mod status_bar;
 mod modal;
 mod sprites;
 mod inventory;
+mod enemy;
 
 #[wasm_bindgen(start)]
 pub fn run() {

@@ -7,13 +7,14 @@ use tinyrand::{Rand, Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
-use crate::components::{Enemy, OnMap, Player};
+use crate::components::{OnMap, Player};
 use crate::door::Door;
+use crate::enemy::Enemy;
 use crate::inventory::{activate_item, inventory_item_for_key, next_inventory_idx, next_inventory_key, HealthPotion, Inventory, InventoryItem};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, Items, SpriteFor};
 use crate::status_bar::StatusBar;
-use crate::terrain::{recreate_terrain, Wall};
+use crate::terrain::{recreate_terrain, Solid};
 
 enum KeyPress<'a> {
     Enter,
@@ -163,6 +164,7 @@ impl GameState {
             let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear && !enemy_locs.contains(&c));
             self.world.spawn((
                 Enemy {},
+                Solid {},
                 OnMap { sprite: AnimationSprites::Enemy1.sprite(), location: loc },
                 BreatheAnimation::new_with_start(AnimationSprites::enemy_breathe(), Duration::from_millis(self.rand.next_u64()))
             ));
@@ -228,14 +230,11 @@ impl GameState {
     pub fn walk(&mut self, dir: Dir) {
         let new_loc = self.get_player::<&OnMap>().location.translate(dir);
 
-        // First check for walls:
-        if self.exists_on_map::<&Wall>(new_loc) { return }
+        // First check if it's passable:
+        let can_move = !self.exists_on_map::<&Solid>(new_loc);
 
-        // Check for enemies:
-        if self.exists_on_map::<&Enemy>(new_loc) { return }
-
-        // Now bump doors:
-        let can_move = Door::try_move(self, new_loc);
+        // Even if we can't move there, if there's a door, bump it:
+        Door::try_bump(&mut self.world, new_loc);
 
         // If all the bumps let us through, actually move:
         if can_move {
