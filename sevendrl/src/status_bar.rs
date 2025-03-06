@@ -85,3 +85,9 @@ impl StatusBar {
         UiFrame::draw_frame(dc, (0.0, 208.0), (30, 4), 0.9)
     }
 }
+
+pub fn set_message(world: &mut World, message: &str) {
+    if let Some((_, status)) = world.query_mut::<&mut StatusBar>().into_iter().next() {
+        status.message = String::from(message)
+    }
+}

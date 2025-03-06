@@ -2,7 +2,9 @@ use cgmath::Vector2;
 use hecs::{Entity, World};
 use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
+use crate::components::Player;
 use crate::sprites::UiFrame;
+use crate::status_bar::set_message;
 
 #[derive(Clone)]
 pub struct Inventory {}
@@ -71,15 +73,12 @@ pub fn activate_item(world: &mut World, item: Entity) {
 
     // If it's a health pot:
     if let Some(_) = result.0 {
-        info!("Drink the potion!")
+        let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
+        player.health = player.max_health.min(player.health + 3);
+        world.despawn(item).unwrap();
+        set_message(world, "Drank health potion")
     }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct HealthPotion {}
-
-impl HealthPotion {
-    pub fn activate(world: &mut World) {
-
-    }
-}
