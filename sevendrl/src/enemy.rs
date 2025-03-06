@@ -1,14 +1,41 @@
+use cgmath::Vector2;
 use hecs::{Entity, World};
-use grid::VecGrid;
-use crate::components::OnMap;
+use log::info;
+use grid::{Grid, VecGrid, bfs, UnreachableError, Coord};
+use crate::components::{OnMap, Player};
 use crate::terrain::{Solid};
 
-#[derive(Copy, Clone, Debug)]
-pub struct Enemy {}
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Enemy {
+    awake: bool
+}
 
 impl Enemy {
     pub fn system(world: &mut World) {
+        let mut enemy_map = enemies_map(world);
+        let player_loc = player_loc(world);
 
+        for n in 0..(enemy_map.size().x * enemy_map.size().y) {
+            let c = enemy_map.coord(n as usize);
+
+            if let PFCellType::Enemy(ent) = enemy_map[c] {
+                if let Ok(mut path) = best_path(&mut enemy_map, player_loc, c) {
+                    // We have a path to the player!
+                    // First cell in our path is where we're at, last cell is the player let's drop those.
+                    path.remove(0);
+                    // If there's any path left (we're not next to the player, in other words):
+                    if let Some(nextmove) = path.first() {
+                        let nextmove = *nextmove;
+                        // We know where we are and where we're going. Take us there:
+                        world.query_one_mut::<&mut OnMap>(ent).unwrap().location = nextmove;
+                        // But now we also need to update the temporary enemy_map, because we don't want
+                        // other mobs to move where we just did, or for where we were to block other mobs:
+                        enemy_map[nextmove] = PFCellType::MovedEnemy;
+                        enemy_map[c] = PFCellType::Clear;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -19,7 +46,8 @@ enum PFCellType {
     #[default]
     Clear,
     Wall,
-    Enemy(Entity)
+    Enemy(Entity),
+    MovedEnemy // An enemy that has already moved this tick
 }
 
 // Make a VecGrid of the enemy locations. TODO don't hard-code the map dimensions
@@ -27,13 +55,41 @@ fn enemies_map(world: &World) -> VecGrid<PFCellType> {
     let mut map = VecGrid::new((64, 64), PFCellType::Clear);
 
     for (ent, (solid, enemy, onmap)) in world.query::<(Option<&Solid>, Option<&Enemy>, &OnMap)>().iter() {
-        map[onmap.location] = if solid.is_some() {
-            PFCellType::Wall
-        } else if enemy.is_some() {
-            PFCellType::Enemy(ent)
-        } else {
-            PFCellType::Clear
+        if enemy.is_some() {
+            map[onmap.location] = PFCellType::Enemy(ent) // enemies are all solid so check this first
+        } else if solid.is_some() {
+            map[onmap.location] = PFCellType::Wall
         }
     }
     map
+}
+
+// Find where the enemies are going
+fn player_loc(world: &mut World) -> Vector2<i32> {
+    let (_, (_, OnMap { location, .. })) = world.query_mut::<(&Player, &OnMap)>().into_iter().next().unwrap();
+    *location
+}
+
+fn best_path(enemy_map: &VecGrid<PFCellType>, player_loc: Vector2<i32>, enemy_loc: Vector2<i32>) -> Result<Vec<Vector2<i32>>, UnreachableError> {
+    // Okay, first of all, if we're already ortho to the player, don't move:
+    // (it's not actually unreachable but this will cause us to not walk)
+    if player_loc.orthogonal(enemy_loc) { return Err(UnreachableError{}) }
+
+    // If we're diagonal, let's see if there's a free ortho cell to us that's also ortho to the player:
+    if enemy_loc.diagonal(player_loc) {
+        return if let Some(tgt) = enemy_map.neighbor_coords(enemy_loc).
+            filter(|c| c.orthogonal(player_loc) && enemy_map[*c] == PFCellType::Clear).next() {
+            // There is! Move there:
+            Ok(vec![enemy_loc, tgt])
+        } else {
+            // There's not; just stay still:
+            Err(UnreachableError{})
+        }
+    }
+
+    // Oof, no one-step answers. Better find a longer path:
+    let traversable = |cell: &PFCellType| *cell == PFCellType::Clear;
+    let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, true, traversable)?;
+    simple_path.pop(); // Remove the player loc from the end
+    Ok(simple_path)
 }

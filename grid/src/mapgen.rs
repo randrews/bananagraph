@@ -4,7 +4,7 @@ use cgmath::Vector2;
 use line_drawing::WalkGrid;
 use rand::prelude::{StdRng};
 use rand::Rng;
-use crate::{Coord, Grid, VecGrid, CountableNeighbors};
+use crate::{Coord, Grid, VecGrid, CountableNeighbors, bft};
 
 pub struct CellularMap {
     size: Vector2<i32>,
@@ -82,29 +82,6 @@ impl CellularMap {
 
         grid
     }
-}
-
-fn bft<T, F: Fn(&T) -> bool>(grid: &impl Grid<CellType=T>, start: impl Into<Vector2<i32>>, traversable: F) -> Vec<Vector2<i32>> {
-    let start = start.into();
-    let mut open = vec![start];
-    let mut visited: Vec<Vector2<i32>> = vec![];
-    let mut closed: HashSet<Vector2<i32>> = HashSet::new();
-
-    while !open.is_empty() {
-        let curr = open.remove(0);
-        closed.insert(curr);
-        if traversable(grid.get(curr).unwrap()) {
-            visited.push(curr);
-            let mut to_add= vec![];
-            for nbr in grid.neighbor_coords(curr).filter(|c| !closed.contains(c) && !open.contains(c) && !visited.contains(c)) {
-
-                to_add.push(nbr)
-            }
-            open.append(&mut to_add);
-        }
-    }
-
-    visited
 }
 
 fn closest_between(group1: &Vec<Vector2<i32>>, group2: &Vec<Vector2<i32>>) -> (Vector2<i32>, Vector2<i32>, i32) {

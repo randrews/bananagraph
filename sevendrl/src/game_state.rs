@@ -116,12 +116,14 @@ impl GameState {
                     self.create_help_modal()
                 }
                 KeyPress::Arrow(dir) => {
-                    self.walk(dir)
+                    self.walk(dir);
+                    Enemy::system(&mut self.world)
                 }
                 KeyPress::Letter(s) => {
                     let c = s.chars().next().unwrap();
                     if let Some(ent) = inventory_item_for_key(&self.world, c) {
                         activate_item(&mut self.world, ent);
+                        Enemy::system(&mut self.world)
                     }
                 }
                 _ => {}
@@ -135,7 +137,7 @@ impl GameState {
     }
 
     pub fn set_map(&mut self, map: VecGrid<CellType>) {
-        self.spawn_enemies(&map, 500);
+        self.spawn_enemies(&map, 100);
         recreate_terrain(map, &mut self.world);
     }
 
@@ -148,6 +150,7 @@ impl GameState {
         // Spawn a new player
         self.world.spawn((
             Player::default(),
+            Solid {},
             OnMap { location, sprite: AnimationSprites::Player1.sprite() },
             BreatheAnimation::new(AnimationSprites::player_breathe())
         ));
@@ -163,7 +166,7 @@ impl GameState {
         for _ in 0..count {
             let loc = map.random_satisfying(|| { self.rand.next_usize() }, |c| map[c] == CellType::Clear && !enemy_locs.contains(&c));
             self.world.spawn((
-                Enemy {},
+                Enemy::default(),
                 Solid {},
                 OnMap { sprite: AnimationSprites::Enemy1.sprite(), location: loc },
                 BreatheAnimation::new_with_start(AnimationSprites::enemy_breathe(), Duration::from_millis(self.rand.next_u64()))
