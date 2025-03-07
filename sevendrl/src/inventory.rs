@@ -80,6 +80,18 @@ pub trait InventoryWorld {
         };
         self.world_mut().spawn((inv,))
     }
+
+    fn consume_from_inventory(&mut self, entity: Entity) {
+        let world = self.world_mut();
+        world.despawn(entity).unwrap();
+
+        let mut indices: Vec<_> = world.query_mut::<&InventoryItem>().into_iter().map(|(e, InventoryItem { index, ..})| (e, index)).collect();
+        indices.sort_by(|a, b| a.1.cmp(b.1));
+
+        for (n, (ent, _)) in indices.into_iter().enumerate() {
+            world.query_one_mut::<&mut InventoryItem>(ent).unwrap().index = n;
+        }
+    }
 }
 
 impl InventoryWorld for World {
@@ -127,7 +139,7 @@ impl TryActivate for HealthPotion {
     fn activate(world: &mut World, entity: Entity) {
         let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
         player.health = player.max_health.min(player.health + 3);
-        world.despawn(entity).unwrap();
+        world.consume_from_inventory(entity);
         set_message(world, "Drank health potion");
     }
 }
@@ -139,7 +151,7 @@ impl TryActivate for EnergyPotion {
     fn activate(world: &mut World, entity: Entity) {
         let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
         player.energy = player.max_energy.min(player.energy + 2);
-        world.despawn(entity).unwrap();
+        world.consume_from_inventory(entity);
         set_message(world, "Drank energy potion");
     }
 }
