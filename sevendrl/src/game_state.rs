@@ -10,10 +10,10 @@ use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{OnMap, Player};
 use crate::door::Door;
 use crate::enemy::Enemy;
-use crate::inventory::{activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld};
+use crate::inventory::{activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, SpriteFor};
-use crate::status_bar::StatusBar;
+use crate::status_bar::{EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
 enum KeyPress<'a> {
@@ -176,13 +176,19 @@ impl GameState {
     }
 
     pub fn create_status_bar(&mut self) {
-        self.world.spawn((StatusBar { message: String::from("Welcome! Press ? for help.") },));
+        self.world.spawn((
+            StatusBar { message: String::from("Welcome! Press ? for help.") },
+            EquippedAbilities::default(),
+        ));
     }
 
     pub fn create_inventory(&mut self) {
         self.world.spawn((Inventory {},));
-        HealthPotion::give(&mut self.world);
-        EnergyPotion::give(&mut self.world);
+        HealthPotion.give(&mut self.world);
+        EnergyPotion.give(&mut self.world);
+
+        Scroll(ScrollType::Shove).give(&mut self.world);
+        Scroll(ScrollType::Leap).give(&mut self.world);
     }
 
     // fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {

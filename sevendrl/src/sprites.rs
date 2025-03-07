@@ -128,6 +128,10 @@ impl UiFrame {
 pub enum Items {
     HealthPotion,
     EnergyPotion,
+    Scroll1,
+    Scroll2,
+    Scroll3,
+    Scroll4
 }
 
 impl SpriteFor for Items {
@@ -136,6 +140,10 @@ impl SpriteFor for Items {
         match self {
             HealthPotion => Sprite::new((0, 0), (16, 16)).with_layer(5),
             EnergyPotion => Sprite::new((32, 0), (16, 16)).with_layer(5),
+            Scroll1 => Sprite::new((0, 112), (16, 16)).with_layer(5),
+            Scroll2 => Sprite::new((48, 112), (16, 16)).with_layer(5),
+            Scroll3 => Sprite::new((64, 112), (16, 16)).with_layer(5),
+            Scroll4 => Sprite::new((128, 112), (16, 16)).with_layer(5),
         }
     }
 }

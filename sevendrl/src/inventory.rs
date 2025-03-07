@@ -3,7 +3,7 @@ use hecs::{Component, Entity, World};
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use crate::components::Player;
 use crate::sprites::{Items, SpriteFor, UiFrame};
-use crate::status_bar::set_message;
+use crate::status_bar::{set_message, EquippedAbilities};
 
 #[derive(Clone)]
 pub struct Inventory {}
@@ -84,12 +84,16 @@ pub trait InventoryWorld {
     fn consume_from_inventory(&mut self, entity: Entity) {
         let world = self.world_mut();
         world.despawn(entity).unwrap();
+        self.compress_indices();
+    }
 
-        let mut indices: Vec<_> = world.query_mut::<&InventoryItem>().into_iter().map(|(e, InventoryItem { index, ..})| (e, index)).collect();
-        indices.sort_by(|a, b| a.1.cmp(b.1));
+    fn compress_indices(&mut self) {
+        let world = self.world_mut();
+        let mut indices: Vec<_> = world.query_mut::<&mut InventoryItem>().into_iter().collect();
+        indices.sort_by(|a, b| a.1.index.cmp(&b.1.index));
 
-        for (n, (ent, _)) in indices.into_iter().enumerate() {
-            world.query_one_mut::<&mut InventoryItem>(ent).unwrap().index = n;
+        for (n, (ent, ii)) in indices.into_iter().enumerate() {
+            ii.index = n;
         }
     }
 }
@@ -107,6 +111,7 @@ impl InventoryWorld for World {
 pub fn activate_item(world: &mut World, item: Entity) {
     HealthPotion::try_activate(world, item);
     EnergyPotion::try_activate(world, item);
+    Scroll::try_activate(world, item);
 }
 
 trait TryActivate where Self: Sized + Component {
@@ -118,11 +123,12 @@ trait TryActivate where Self: Sized + Component {
     }
 }
 
-pub trait Give where Self: Sized + Component + Default {
-    fn give(world: &mut World);
-    fn give_inner(world: &mut World, name: &str, sprite: Sprite) {
+pub trait Give where Self: Sized + Component {
+    fn inventory_attrs(&self) -> (&str, Sprite);
+    fn give(self, world: &mut World) {
+        let (name, sprite) = self.inventory_attrs();
         let i = world.add_to_inventory(name, sprite);
-        let _ = world.insert(i, (Self::default(),));
+        let _ = world.insert(i, (self,));
     }
 }
 
@@ -130,8 +136,8 @@ pub trait Give where Self: Sized + Component + Default {
 pub struct HealthPotion;
 
 impl Give for HealthPotion {
-    fn give(world: &mut World) {
-        Self::give_inner(world, "Potion", Items::HealthPotion.sprite())
+    fn inventory_attrs(&self) -> (&str, Sprite) {
+        ("Potion", Items::HealthPotion.sprite())
     }
 }
 
@@ -157,7 +163,71 @@ impl TryActivate for EnergyPotion {
 }
 
 impl Give for EnergyPotion {
-    fn give(world: &mut World) {
-        Self::give_inner(world,"Energy Potion", Items::EnergyPotion.sprite());
+    fn inventory_attrs(&self) -> (&str, Sprite) {
+        ("Energy Potion", Items::EnergyPotion.sprite())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ScrollType {
+    PhaseWalk,
+    Leap,
+    Shove,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Scroll(pub ScrollType);
+
+impl Give for Scroll {
+    fn inventory_attrs(&self) -> (&str, Sprite) {
+        match self.0 {
+            ScrollType::PhaseWalk => ("Phase Walk", Items::Scroll1.sprite()),
+            ScrollType::Leap => ("Leap", Items::Scroll2.sprite()),
+            ScrollType::Shove => ("Shove", Items::Scroll3.sprite()),
+        }
+    }
+}
+
+impl Scroll {
+    pub fn equip_slot(&self) -> i32 {
+        match self.0 {
+            ScrollType::PhaseWalk => 2,
+            ScrollType::Leap => 0,
+            ScrollType::Shove => 0,
+        }
+    }
+}
+
+impl TryActivate for Scroll {
+    fn activate(world: &mut World, entity: Entity) {
+        let scroll = *world.query_one::<&Scroll>(entity).unwrap().get().unwrap();
+        if let Some((_, equipped)) = world.query_mut::<&mut EquippedAbilities>().into_iter().next() {
+            // what was already in the slot?
+            let existing =
+                match scroll.equip_slot() {
+                    0 => equipped.slot1,
+                    1 => equipped.slot2,
+                    2 => equipped.slot3,
+                    _ => equipped.slot1,
+                };
+
+            // put it in the slot
+            match scroll.equip_slot() {
+                0 => equipped.slot1 = Some(entity),
+                1 => equipped.slot2 = Some(entity),
+                2 => equipped.slot3 = Some(entity),
+                _ => equipped.slot1 = Some(entity),
+            }
+
+            // remove the new one from the inventory
+            world.remove::<(InventoryItem,)>(entity).unwrap();
+            world.compress_indices();
+
+            // If there was an old one, put it in the inventory:
+            if let Some(old) = existing {
+                let scroll = world.query_one_mut::<&Scroll>(old).unwrap();
+                scroll.give(world)
+            }
+        }
     }
 }

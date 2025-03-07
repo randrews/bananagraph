@@ -1,7 +1,9 @@
 use cgmath::Vector2;
-use hecs::World;
+use hecs::{Entity, World};
+use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use crate::components::Player;
+use crate::inventory::{Give, Scroll};
 use crate::sprites::UiFrame;
 
 #[derive(Clone)]
@@ -16,7 +18,7 @@ impl StatusBar {
 
         // Print the current status line
         if let Some((_, status_bar)) = world.query::<&StatusBar>().into_iter().next() {
-            let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 13.0);
+            let coord = Self::tile_coord((0, 0)) + Vector2::new(0.0, 11.0);
             sprites.append(&mut typeface.print(dc, coord, 0.3, status_bar.message.as_str()));
         }
 
@@ -33,9 +35,9 @@ impl StatusBar {
             );
 
             let hleft = typeface.width("Health:");
-            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 1)) + Vector2::new(0.0, 13.0), 0.3, "Health:"));
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 1)) + Vector2::new(0.0, 11.0), 0.3, "Health:"));
             let eleft = typeface.width("Energy:");
-            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 2)) + Vector2::new(0.0, 13.0), 0.3, "Energy:"));
+            sprites.append(&mut typeface.print(dc, Self::tile_coord((0, 2)) + Vector2::new(0.0, 11.0), 0.3, "Energy:"));
             let left = hleft.max(eleft);
 
             for n in 0u32..player.max_energy {
@@ -60,6 +62,8 @@ impl StatusBar {
                 sprites.push(dc.place(spr, c))
             }
         }
+
+        sprites.append(&mut EquippedAbilities::sprites(world, dc, typeface));
         sprites
     }
 
@@ -89,5 +93,30 @@ impl StatusBar {
 pub fn set_message(world: &mut World, message: &str) {
     if let Some((_, status)) = world.query_mut::<&mut StatusBar>().into_iter().next() {
         status.message = String::from(message)
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
+pub struct EquippedAbilities {
+    pub slot1: Option<Entity>,
+    pub slot2: Option<Entity>,
+    pub slot3: Option<Entity>,
+}
+
+impl EquippedAbilities {
+    fn sprites(world: &World, dc: DrawingContext, typeface: &Typeface) -> Vec<Sprite> {
+        let mut sprites = vec![];
+        if let Some((_, EquippedAbilities { slot1, slot2, slot3 })) = world.query::<&EquippedAbilities>().iter().next() {
+            if let Some(ent) = slot1 {
+                if let Some(scroll) = world.query_one::<&Scroll>(*ent).unwrap().get() {
+                    let (name, sprite) = scroll.inventory_attrs();
+                    sprites.push(dc.place(sprite, StatusBar::tile_coord((18, 0))));
+                    let caption = format!("[1] {}", name);
+                    sprites.append(&mut typeface.print(dc, StatusBar::tile_coord((19, 0)) + Vector2::new(4.0, 11.0), 0.8, caption.as_str()))
+                }
+            }
+        }
+
+        sprites
     }
 }
