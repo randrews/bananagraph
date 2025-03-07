@@ -75,21 +75,16 @@ fn best_path(enemy_map: &VecGrid<PFCellType>, player_loc: Vector2<i32>, enemy_lo
     // (it's not actually unreachable but this will cause us to not walk)
     if player_loc.orthogonal(enemy_loc) { return Err(UnreachableError{}) }
 
-    // If we're diagonal, let's see if there's a free ortho cell to us that's also ortho to the player:
-    if enemy_loc.diagonal(player_loc) {
-        return if let Some(tgt) = enemy_map.neighbor_coords(enemy_loc).
-            filter(|c| c.orthogonal(player_loc) && enemy_map[*c] == PFCellType::Clear).next() {
-            // There is! Move there:
-            Ok(vec![enemy_loc, tgt])
-        } else {
-            // There's not; just stay still:
-            Err(UnreachableError{})
-        }
+    // Let's see if there's a free one-move for us that's also ortho to the player:
+    let empty_next_to_player = |c: &Vector2<i32>| c.orthogonal(player_loc) && enemy_map[*c] == PFCellType::Clear;
+    if let Some(tgt) = enemy_map.adjacent_coords(enemy_loc).filter(empty_next_to_player).next() {
+        // There is! Move there:
+        return Ok(vec![enemy_loc, tgt])
     }
 
     // Oof, no one-step answers. Better find a longer path:
     let traversable = |cell: &PFCellType| *cell == PFCellType::Clear;
-    let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, true, traversable)?;
+    let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, false, traversable)?;
     simple_path.pop(); // Remove the player loc from the end
     Ok(simple_path)
 }

@@ -120,12 +120,12 @@ pub trait Grid {
         let point = point.into();
         let c = vec![
             point.north(),
-            point.northeast(),
             point.east(),
-            point.southeast(),
             point.south(),
-            point.southwest(),
             point.west(),
+            point.northeast(),
+            point.southeast(),
+            point.southwest(),
             point.northwest()
         ];
         c.into_iter().filter(|pt| self.contains(*pt))
