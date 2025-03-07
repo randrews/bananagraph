@@ -1,6 +1,10 @@
 use cgmath::Vector2;
+use hecs::World;
 use bananagraph::{DrawingContext, Sprite};
+use crate::animation::OneShotAnimation;
+use crate::components::OnMap;
 use crate::sprites::AnimationSprites::Shove1;
+use crate::terrain::Opaque;
 
 pub trait SpriteFor {
     fn sprite(&self) -> Sprite;
@@ -52,6 +56,14 @@ impl AnimationSprites {
         [
             EnemyFade1, EnemyFade2, EnemyFade3
         ].map(|a| a.sprite()).into_iter().collect()
+    }
+
+    pub fn enemy_fade_at(world: &mut World, at: impl Into<Vector2<i32>>) {
+        world.spawn((
+            OnMap { location: at.into(), sprite: AnimationSprites::EnemyFade1.sprite() },
+            OneShotAnimation::new(Self::enemy_fade()),
+            Opaque
+            ));
     }
 
     pub fn shove() -> Vec<Sprite> {

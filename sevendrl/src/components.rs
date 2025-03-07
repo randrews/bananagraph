@@ -99,3 +99,12 @@ impl Default for Player {
         }
     }
 }
+
+impl Player {
+    pub fn give_energy(&mut self, delta: u32) {
+        self.energy = self.max_energy.min(self.energy + delta)
+    }
+    pub fn give_health(&mut self, delta: u32) {
+        self.health = self.max_health.min(self.health + delta)
+    }
+}
