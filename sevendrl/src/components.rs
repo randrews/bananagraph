@@ -2,6 +2,7 @@ use cgmath::Vector2;
 use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
 use hecs::World;
 use bananagraph::{DrawingContext, Sprite};
+use crate::enemy::Enemy;
 use crate::sprites::{MapCells, SpriteFor};
 use crate::terrain::Opaque;
 
@@ -49,11 +50,22 @@ impl OnMap {
             sprites.push(dc.place(*sprite, local_coords).with_z(0.8));
 
             // If this isn't in fov, plant an opaque fog sprite on top of it:
-            if !fov_map.fov[location.x as usize + location.y as usize * 64usize] {
+            if !fov_map.fov[location.x as usize + location.y as usize * 64usize] { // TODO don't hard code map size
                 sprites.push(dc.place(fog, local_coords))
             }
         }
         sprites
+    }
+
+    pub fn awaken_enemies(world: &mut World) {
+        let player_loc = player_loc(world);
+        let fov_map = map_data_for(world, (64, 64), player_loc);
+
+        for (_, (OnMap { location, .. }, Enemy { awake })) in world.query_mut::<(&mut OnMap, &mut Enemy)>().into_iter() {
+            if fov_map.fov[location.x as usize + location.y as usize * 64usize] { // TODO don't hard code map size
+                *awake = true
+            }
+        }
     }
 }
 

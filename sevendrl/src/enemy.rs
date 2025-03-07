@@ -6,18 +6,19 @@ use crate::terrain::{Solid};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Enemy {
-    awake: bool
+    pub awake: bool
 }
 
 impl Enemy {
     pub fn system(world: &mut World) {
+        OnMap::awaken_enemies(world); // First let's update who can see us
         let mut enemy_map = enemies_map(world);
         let player_loc = player_loc(world);
 
         for n in 0..(enemy_map.size().x * enemy_map.size().y) {
             let c = enemy_map.coord(n as usize);
 
-            if let PFCellType::Enemy(ent) = enemy_map[c] {
+            if let PFCellType::Enemy(ent, true) = enemy_map[c] {
                 if let Ok(mut path) = best_path(&mut enemy_map, player_loc, c) {
                     // We have a path to the player!
                     // First cell in our path is where we're at, last cell is the player let's drop those.
@@ -45,7 +46,7 @@ enum PFCellType {
     #[default]
     Clear,
     Wall,
-    Enemy(Entity),
+    Enemy(Entity, bool),
     MovedEnemy // An enemy that has already moved this tick
 }
 
@@ -55,7 +56,7 @@ fn enemies_map(world: &World) -> VecGrid<PFCellType> {
 
     for (ent, (solid, enemy, onmap)) in world.query::<(Option<&Solid>, Option<&Enemy>, &OnMap)>().iter() {
         if enemy.is_some() {
-            map[onmap.location] = PFCellType::Enemy(ent) // enemies are all solid so check this first
+            map[onmap.location] = PFCellType::Enemy(ent, enemy.unwrap().awake) // enemies are all solid so check this first
         } else if solid.is_some() {
             map[onmap.location] = PFCellType::Wall
         }
