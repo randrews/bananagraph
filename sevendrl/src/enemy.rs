@@ -84,7 +84,7 @@ fn best_path(enemy_map: &VecGrid<PFCellType>, player_loc: Vector2<i32>, enemy_lo
 
     // Oof, no one-step answers. Better find a longer path:
     let traversable = |cell: &PFCellType| *cell == PFCellType::Clear;
-    let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, false, traversable)?;
+    let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, true, traversable)?;
     simple_path.pop(); // Remove the player loc from the end
     Ok(simple_path)
 }
