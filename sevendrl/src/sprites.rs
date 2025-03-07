@@ -1,5 +1,6 @@
 use cgmath::Vector2;
 use bananagraph::{DrawingContext, Sprite};
+use crate::sprites::AnimationSprites::Shove1;
 
 pub trait SpriteFor {
     fn sprite(&self) -> Sprite;
@@ -16,6 +17,9 @@ pub enum AnimationSprites {
     EnemyFade1, // Enemy fade animation frames
     EnemyFade2,
     EnemyFade3,
+    Shove1, // Shove ability effect animation
+    Shove2,
+    Shove3,
 }
 
 impl AnimationSprites {
@@ -49,6 +53,15 @@ impl AnimationSprites {
             EnemyFade1, EnemyFade2, EnemyFade3
         ].map(|a| a.sprite()).into_iter().collect()
     }
+
+    pub fn shove() -> Vec<Sprite> {
+        use AnimationSprites::*;
+        [
+            Shove1,
+            Shove2,
+            Shove3
+        ].map(|a| a.sprite()).into_iter().collect()
+    }
 }
 
 impl SpriteFor for AnimationSprites {
@@ -66,6 +79,10 @@ impl SpriteFor for AnimationSprites {
             EnemyFade1 => Sprite::new((128, 96), (16, 16)).with_layer(4),
             EnemyFade2 => Sprite::new((144, 96), (16, 16)).with_layer(4),
             EnemyFade3 => Sprite::new((160, 96), (16, 16)).with_layer(4),
+
+            Shove1 => Sprite::new((128, 112), (16, 16)).with_layer(4),
+            Shove2 => Sprite::new((144, 112), (16, 16)).with_layer(4),
+            Shove3 => Sprite::new((160, 112), (16, 16)).with_layer(4),
         }
     }
 }

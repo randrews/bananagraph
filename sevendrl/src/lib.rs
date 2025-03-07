@@ -13,6 +13,7 @@ mod modal;
 mod sprites;
 mod inventory;
 mod enemy;
+mod scrolls;
 
 #[wasm_bindgen(start)]
 pub fn run() {

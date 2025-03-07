@@ -10,7 +10,7 @@ use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{OnMap, Player};
 use crate::door::Door;
 use crate::enemy::Enemy;
-use crate::inventory::{activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
+use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::{EquippedAbilities, StatusBar};
@@ -124,6 +124,8 @@ impl GameState {
                     if let Some(ent) = self.world.inventory_item_for_key(c) {
                         activate_item(&mut self.world, ent);
                         Enemy::system(&mut self.world)
+                    } else if c == '1' || c == '2' || c == '3' {
+                        activate_ability(&mut self.world, c)
                     }
                 }
                 _ => {}

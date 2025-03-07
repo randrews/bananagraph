@@ -12,7 +12,7 @@ pub struct OnMap {
     pub sprite: Sprite
 }
 
-fn player_loc(world: &World) -> Vector2<i32> {
+pub fn player_loc(world: &World) -> Vector2<i32> {
     world.query::<(&Player, &OnMap)>().into_iter().next().map(|(_, (_, onmap))| onmap.location).unwrap()
 }
 

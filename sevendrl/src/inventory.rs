@@ -1,7 +1,8 @@
 use cgmath::Vector2;
 use hecs::{Component, Entity, World};
 use bananagraph::{DrawingContext, Sprite, Typeface};
-use crate::components::Player;
+use crate::components::{OnMap, Player};
+use crate::scrolls::shove_scroll;
 use crate::sprites::{Items, SpriteFor, UiFrame};
 use crate::status_bar::{set_message, EquippedAbilities};
 
@@ -156,7 +157,7 @@ pub struct EnergyPotion;
 impl TryActivate for EnergyPotion {
     fn activate(world: &mut World, entity: Entity) {
         let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
-        player.energy = player.max_energy.min(player.energy + 2);
+        player.energy = player.max_energy.min(player.energy + 3);
         world.consume_from_inventory(entity);
         set_message(world, "Drank energy potion");
     }
@@ -196,6 +197,22 @@ impl Scroll {
             ScrollType::Shove => 0,
         }
     }
+
+    pub fn perform(&self, world: &mut World) {
+        match self.0 {
+            ScrollType::PhaseWalk => {}
+            ScrollType::Leap => {}
+            ScrollType::Shove => shove_scroll(world)
+        }
+    }
+
+    pub fn cost(&self) -> u32 {
+        match self.0 {
+            ScrollType::PhaseWalk => 5,
+            ScrollType::Leap => 1,
+            ScrollType::Shove => 2
+        }
+    }
 }
 
 impl TryActivate for Scroll {
@@ -230,4 +247,23 @@ impl TryActivate for Scroll {
             }
         }
     }
+}
+
+pub fn activate_ability(world: &mut World, slot: char) {
+    // First, figure out what we're actually wanting to do:
+    let equipped = *world.query::<&EquippedAbilities>().iter().next().unwrap().1;
+    let scroll_ent = match slot {
+        '1' => equipped.slot1,
+        '2' => equipped.slot2,
+        '3' => equipped.slot3,
+        _ => equipped.slot1
+    };
+
+    if scroll_ent.is_none() {
+        set_message(world, format!("No ability in slot {}", slot).as_str());
+        return;
+    }
+
+    let scroll = *world.query_one::<&Scroll>(scroll_ent.unwrap()).unwrap().get().unwrap();
+    scroll.perform(world);
 }
