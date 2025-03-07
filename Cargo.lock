@@ -873,7 +873,6 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "line_drawing",
- "log",
  "rand 0.8.5",
  "tinyrand",
 ]

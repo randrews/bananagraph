@@ -5,7 +5,7 @@ use bananagraph::{DrawingContext, Sprite, Typeface};
 #[derive(Clone, Debug, PartialEq)]
 pub enum DismissType {
     Any,
-    Letter(String),
+    //Letter(String),
 }
 
 #[derive(Clone, Debug)]

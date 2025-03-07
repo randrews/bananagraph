@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use cgmath::Vector2;
-use log::info;
 use crate::Grid;
 
 /// Do a breadth-first traversal of the grid, finding all cells reachable from a given start point, with reachability

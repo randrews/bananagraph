@@ -1,7 +1,7 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::time::Duration;
 use cgmath::{Point2, Vector2};
-use hecs::{DynamicBundle, Entity, Query, World};
+use hecs::{Entity, Query, World};
 use log::info;
 use tinyrand::{Rand, Seeded, Xorshift};
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
@@ -10,9 +10,9 @@ use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{OnMap, Player};
 use crate::door::Door;
 use crate::enemy::Enemy;
-use crate::inventory::{activate_item, inventory_item_for_key, next_inventory_idx, next_inventory_key, HealthPotion, Inventory, InventoryItem};
+use crate::inventory::{activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld};
 use crate::modal::{ContentType, DismissType, Modal};
-use crate::sprites::{AnimationSprites, Items, SpriteFor};
+use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::StatusBar;
 use crate::terrain::{recreate_terrain, Solid};
 
@@ -121,7 +121,7 @@ impl GameState {
                 }
                 KeyPress::Letter(s) => {
                     let c = s.chars().next().unwrap();
-                    if let Some(ent) = inventory_item_for_key(&self.world, c) {
+                    if let Some(ent) = self.world.inventory_item_for_key(c) {
                         activate_item(&mut self.world, ent);
                         Enemy::system(&mut self.world)
                     }
@@ -181,36 +181,26 @@ impl GameState {
 
     pub fn create_inventory(&mut self) {
         self.world.spawn((Inventory {},));
-        let i = self.add_to_inventory("Potion", Items::HealthPotion.sprite());
-        let _ = self.world.insert(i, (HealthPotion {},));
+        HealthPotion::give(&mut self.world);
+        EnergyPotion::give(&mut self.world);
     }
 
-    pub fn add_to_inventory(&mut self, name: &str, sprite: Sprite) -> Entity {
-        let inv = InventoryItem {
-            name: String::from(name),
-            sprite,
-            index: next_inventory_idx(&self.world),
-            key: Some(next_inventory_key(&self.world))
-        };
-        self.world.spawn((inv,))
-    }
-
-    fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
-        let loc = loc.into();
-        self.world.query_mut::<(Q, &OnMap)>().into_iter()
-            .filter_map(|(e, (q, on_map))| {
-                if on_map.location == loc {
-                    Some((e, q))
-                } else {
-                    None
-                }
-            }).collect()
-    }
+    // fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
+    //     let loc = loc.into();
+    //     self.world.query_mut::<(Q, &OnMap)>().into_iter()
+    //         .filter_map(|(e, (q, on_map))| {
+    //             if on_map.location == loc {
+    //                 Some((e, q))
+    //             } else {
+    //                 None
+    //             }
+    //         }).collect()
+    // }
 
     fn find_entities_on_map<Q: Query>(&self, loc: impl Into<Vector2<i32>>) -> Vec<Entity> {
         let loc = loc.into();
         self.world.query::<(Q, &OnMap)>().into_iter()
-            .filter_map(|(e, (q, on_map))| {
+            .filter_map(|(e, (_, on_map))| {
                 if on_map.location == loc {
                     Some(e)
                 } else {
@@ -248,7 +238,7 @@ impl GameState {
             if let Some(ent) = self.find_entities_on_map::<&Enemy>(beyond).first() {
                 self.world.despawn(*ent).unwrap(); // Kill the enemy
                 // Give the player some energy as a reward
-                if let Some((_, mut player)) = self.world.query_mut::<&mut Player>().into_iter().next() {
+                if let Some((_, player)) = self.world.query_mut::<&mut Player>().into_iter().next() {
                     player.energy = (player.energy + 1).min(player.max_energy)
                 }
                 // Spawn a one-shot showing the enemy fading

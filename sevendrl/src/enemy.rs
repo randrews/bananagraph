@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use hecs::{Entity, World};
-use log::info;
 use grid::{Grid, VecGrid, bfs, UnreachableError, Coord};
 use crate::components::{OnMap, Player};
 use crate::terrain::{Solid};
