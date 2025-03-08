@@ -1,11 +1,12 @@
 use cgmath::Vector2;
 use hecs::World;
+use tinyrand::Rand;
 use grid::{Coord, Grid, VecGrid};
 use crate::animation::OneShotAnimation;
 use crate::components::{player_loc, OnMap, Player};
 use crate::enemy::{enemies_map, Enemy, PFCellType};
 use crate::inventory::Scroll;
-use crate::inventory::ScrollType::Shove;
+use crate::inventory::ScrollType::{Leap, Shove};
 use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::set_message;
 
@@ -50,12 +51,72 @@ pub fn shove_scroll(world: &mut World) {
     }
 }
 
+/// A leap scroll teleports you to a random free space within your vision
+pub fn leap_scroll(world: &mut World, rand: &mut impl Rand) {
+    let cost = Scroll(Leap).cost();
+    if get_player(world).energy < cost {
+        set_message(world, format!("Need {} energy to leap", cost).as_str());
+        return
+    }
+
+    let target_cell = { // Pick a random clear one
+        // So first we need a list of spaces in your vision:
+        let mut visible = visible_cells(world);
+        let enemies = enemies_map(world);
+        let mut c = None;
+        loop {
+            if visible.is_empty() {
+                set_message(world, "Nowhere to leap to!");
+                return
+            }
+            let i = rand.next_usize() % visible.len();
+            c = Some(visible.remove(i));
+            if enemies[c.unwrap()] == PFCellType::Clear { break }
+        }
+        c.unwrap()
+    };
+
+    // Pull the player loc, we're going to drop an animation there
+    let old = player_loc(world);
+    // Update the player's loc
+    get_player_onmap_mut(world).location = target_cell;
+    // Place an animation
+    world.spawn((
+        OneShotAnimation::new(AnimationSprites::shove()),
+        OnMap { location: old, sprite: AnimationSprites::Shove1.sprite() }
+    ));
+    // Charge them for it
+    get_player_mut(world).energy -= cost;
+    set_message(world, "You leap to safety!")
+}
+
+pub fn phasewalk_scroll(world: &mut World) {
+
+}
+
+fn visible_cells(world: &World) -> Vec<Vector2<i32>> {
+    let fov_map = crate::components::map_data_for(world, (64, 64), player_loc(world)); // TODO don't hardcode map size
+    let mut cells = vec![];
+    for y in 0..fov_map.height {
+        for x in 0..fov_map.width {
+            if fov_map.fov[x + y * 64usize] {
+                cells.push(Vector2::new(x as i32, y as i32))
+            }
+        }
+    }
+    cells
+}
+
 fn get_player(world: &World) -> Player {
     *world.query::<&Player>().iter().next().unwrap().1
 }
 
 fn get_player_mut(world: &mut World) -> &mut Player {
     world.query_mut::<&mut Player>().into_iter().next().unwrap().1
+}
+
+fn get_player_onmap_mut(world: &mut World) -> &mut OnMap {
+    world.query_mut::<(&mut Player, &mut OnMap)>().into_iter().next().unwrap().1.1
 }
 
 fn update_world(map: VecGrid<PFCellType>, world: &mut World) {

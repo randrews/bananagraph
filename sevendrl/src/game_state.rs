@@ -126,7 +126,7 @@ impl GameState {
                         activate_item(&mut self.world, ent);
                         Enemy::system(&mut self.world)
                     } else if c == '1' || c == '2' || c == '3' {
-                        activate_ability(&mut self.world, c)
+                        activate_ability(&mut self.world, c, &mut self.rand)
                     }
                 }
                 _ => {}

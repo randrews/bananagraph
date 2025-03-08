@@ -3,7 +3,7 @@ use hecs::{Component, Entity, World};
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use crate::components::{OnMap, Player};
-use crate::scrolls::shove_scroll;
+use crate::scrolls::{leap_scroll, phasewalk_scroll, shove_scroll};
 use crate::sprites::{Items, SpriteFor, UiFrame};
 use crate::status_bar::{set_message, EquippedAbilities};
 
@@ -208,10 +208,10 @@ impl Scroll {
         }
     }
 
-    pub fn perform(&self, world: &mut World) {
+    pub fn perform(&self, world: &mut World, rand: &mut impl Rand) {
         match self.0 {
-            ScrollType::PhaseWalk => {}
-            ScrollType::Leap => {}
+            ScrollType::PhaseWalk => phasewalk_scroll(world),
+            ScrollType::Leap => leap_scroll(world, rand),
             ScrollType::Shove => shove_scroll(world)
         }
     }
@@ -259,7 +259,7 @@ impl TryActivate for Scroll {
     }
 }
 
-pub fn activate_ability(world: &mut World, slot: char) {
+pub fn activate_ability(world: &mut World, slot: char, rand: &mut impl Rand) {
     // First, figure out what we're actually wanting to do:
     let equipped = *world.query::<&EquippedAbilities>().iter().next().unwrap().1;
     let scroll_ent = match slot {
@@ -275,7 +275,7 @@ pub fn activate_ability(world: &mut World, slot: char) {
     }
 
     let scroll = *world.query_one::<&Scroll>(scroll_ent.unwrap()).unwrap().get().unwrap();
-    scroll.perform(world);
+    scroll.perform(world, rand);
 }
 
 #[derive(Copy, Clone, Debug, Default)]

@@ -74,7 +74,7 @@ impl OnMap {
     }
 }
 
-fn map_data_for(world: &World, size: impl Into<Vector2<usize>>, player_loc: impl Into<Vector2<i32>>) -> MapData {
+pub fn map_data_for(world: &World, size: impl Into<Vector2<usize>>, player_loc: impl Into<Vector2<i32>>) -> MapData {
     let (player_loc, size) = (player_loc.into(), size.into());
     let mut map = MapData::new(size.x, size.y);
 
