@@ -23,6 +23,16 @@ pub struct Enemy {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Dazed;
 
+impl Dazed {
+    pub fn system(world: &mut World) {
+        // Anything that was dazed for this round isn't any more:
+        let dazed: Vec<_> = world.query::<&Dazed>().iter().map(|(e, _)| e).collect();
+        for e in dazed {
+            world.remove_one::<Dazed>(e).unwrap();
+        }
+    }
+}
+
 impl Enemy {
     pub fn death_animation(&self) -> OneShotAnimation {
         match self.enemy_type {
@@ -32,6 +42,8 @@ impl Enemy {
     }
 
     pub fn system(world: &mut World) {
+        Enemy::attack_system(world);
+
         OnMap::awaken_enemies(world); // First let's update who can see us
         let mut enemy_map = enemies_map(world);
         let player_loc = player_loc(world);
@@ -57,12 +69,12 @@ impl Enemy {
                 }
             }
         }
+    }
 
-        // Anything that was dazed for this round isn't any more:
-        let dazed: Vec<_> = world.query::<&Dazed>().iter().map(|(e, _)| e).collect();
-        for e in dazed {
-            world.remove_one::<Dazed>(e).unwrap();
-        }
+    pub fn attack_system(world: &mut World) {
+        let player_loc = player_loc(world);
+        let count = world.query::<(&OnMap, &Enemy, Option<&Dazed>)>().iter().filter(|&(_, (om, e, dz))| om.location.orthogonal(player_loc) && dz.is_none() && e.awake).count();
+        if count > 0 { damage_player(world, count as u32) }
     }
 
     pub fn try_shove(world: &mut World, location: Vector2<i32>, dir: Dir) -> bool {
@@ -134,4 +146,10 @@ fn best_path(enemy_map: &VecGrid<PFCellType>, player_loc: Vector2<i32>, enemy_lo
     let mut simple_path = bfs(enemy_map, enemy_loc, player_loc, true, traversable)?;
     simple_path.pop(); // Remove the player loc from the end
     Ok(simple_path)
+}
+
+fn damage_player(world: &mut World, damage: u32) {
+    let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
+    let new_health = (player.health - damage) as i32;
+    player.health = 0i32.max(new_health) as u32;
 }

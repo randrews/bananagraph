@@ -10,7 +10,7 @@ use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{Chest, OnMap, Player};
 use crate::door::Door;
-use crate::enemy::Enemy;
+use crate::enemy::{Dazed, Enemy};
 use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, Items, SpriteFor};
@@ -129,15 +129,18 @@ impl GameState {
                 }
                 KeyPress::Arrow(dir) => {
                     self.walk(dir);
-                    Enemy::system(&mut self.world)
+                    Enemy::system(&mut self.world);
+                    Dazed::system(&mut self.world);
                 }
                 KeyPress::Letter(s) => {
                     let c = s.chars().next().unwrap();
                     if let Some(ent) = self.world.inventory_item_for_key(c) {
                         activate_item(&mut self.world, ent);
-                        Enemy::system(&mut self.world)
+                        Enemy::system(&mut self.world);
+                        Dazed::system(&mut self.world);
                     } else if c == '1' || c == '2' || c == '3' {
-                        activate_ability(&mut self.world, c, &mut self.rand)
+                        activate_ability(&mut self.world, c, &mut self.rand);
+                        Dazed::system(&mut self.world);
                     }
                 }
                 _ => {}
@@ -308,8 +311,6 @@ impl GameState {
                     anim,
                     OnMap { location: beyond, sprite: frame }
                     ));
-            } else {
-
             }
 
             // Try to grab things if things are there:

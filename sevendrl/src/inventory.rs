@@ -159,7 +159,7 @@ impl Give for HealthPotion {
 impl TryActivate for HealthPotion {
     fn activate(world: &mut World, entity: Entity) {
         let (_, player) = world.query_mut::<&mut Player>().into_iter().next().unwrap();
-        player.health = player.max_health.min(player.health + 3);
+        player.health = player.max_health.min(player.health + 4);
         world.consume_from_inventory(entity);
         set_message(world, "Drank health potion");
     }
@@ -305,7 +305,6 @@ impl Grabbable {
                 return
             }
             world.remove::<(OnMap, Grabbable)>(ent).unwrap();
-            //let (hp, ep, sc) = world.query_one::<(Option<&HealthPotion>, Option<&EnergyPotion>, Option<&Scroll>)>(ent).unwrap().get().unwrap();
             if let Some(&hp) = world.query_one_mut::<Option<&HealthPotion>>(ent).unwrap() {
                 hp.give(world);
             } else if let Some(&ep) = world.query_one_mut::<Option<&EnergyPotion>>(ent).unwrap() {

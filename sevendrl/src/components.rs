@@ -4,7 +4,7 @@ use hecs::World;
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite};
 use crate::animation::BreatheAnimation;
-use crate::enemy::{Enemy, EnemyType};
+use crate::enemy::{Dazed, Enemy, EnemyType};
 use crate::inventory::{EnergyPotion, Give, Grabbable, HealthPotion, Scroll, ScrollType};
 use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
 use crate::status_bar::set_message;
@@ -169,7 +169,8 @@ impl Chest {
             Some((ent, Chest::Mimic)) => {
                 _ = world.remove::<(Chest,)>(ent);
                 let breathe = BreatheAnimation::new(AnimationSprites::mimic_breathe());
-                world.insert(ent, (breathe, Enemy { awake: true, enemy_type: EnemyType::Mimic })).unwrap();
+                // All mimics start dazed, so we get one turn to react
+                world.insert(ent, (breathe, Enemy { awake: true, enemy_type: EnemyType::Mimic }, Dazed)).unwrap();
                 set_message(world, "That wasn't a chest, it was a mimic!");
             }
             _ => { } // bah

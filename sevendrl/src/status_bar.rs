@@ -52,9 +52,9 @@ impl StatusBar {
 
             for n in (0u32..player.max_health).step_by(2) {
                 let c = Self::tile_coord((n as i32 / 2, 1)) + Vector2::new(left, 0.0);
-                let spr = if player.health - 2 >= n {
+                let spr = if player.health as i32 - 2 >= n as i32 {
                     health_icons.2
-                } else if player.health - 1 == n {
+                } else if player.health as i32 - 1 == n as i32 {
                     health_icons.1
                 } else {
                     health_icons.0
