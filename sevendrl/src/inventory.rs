@@ -104,6 +104,13 @@ pub trait InventoryWorld {
         // Inventory limit is a dozen
         world.query::<&InventoryItem>().iter().count() >= 12
     }
+
+    fn has_scroll_of_type(&self, scroll_type: ScrollType) -> bool {
+        for (_, (ii, ea, Scroll(st))) in self.world().query::<(Option<&InventoryItem>, Option<&EquippedAbilities>, &Scroll)>().iter() {
+            if (ii.is_some() || ea.is_some()) && *st == scroll_type { return true }
+        }
+        false
+    }
 }
 
 impl InventoryWorld for World {
@@ -176,7 +183,7 @@ impl Give for EnergyPotion {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScrollType {
     PhaseWalk,
     Leap,
@@ -298,13 +305,20 @@ impl Grabbable {
                 return
             }
             world.remove::<(OnMap, Grabbable)>(ent).unwrap();
-            let (hp, ep, sc) = world.query_one_mut::<(Option<&mut HealthPotion>, Option<&mut EnergyPotion>, Option<&mut Scroll>)>(ent).unwrap();
-            if let Some(hp) = hp {
+            //let (hp, ep, sc) = world.query_one::<(Option<&HealthPotion>, Option<&EnergyPotion>, Option<&Scroll>)>(ent).unwrap().get().unwrap();
+            if let Some(&hp) = world.query_one_mut::<Option<&HealthPotion>>(ent).unwrap() {
                 hp.give(world);
-            } else if let Some(ep) = ep {
+            } else if let Some(&ep) = world.query_one_mut::<Option<&EnergyPotion>>(ent).unwrap() {
                 ep.give(world);
-            } else if let Some(sc) = sc {
-                sc.give(world)
+            } else if let Some(&sc) = world.query_one_mut::<Option<&Scroll>>(ent).unwrap() {
+                if world.has_scroll_of_type(sc.0) {
+                    set_message(world, "You already have this scroll, so your focus increases");
+                    let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
+                    player.energy += 1;
+                    player.max_energy += 1;
+                } else {
+                    sc.give(world)
+                }
             }
         }
     }

@@ -17,6 +17,17 @@ use crate::sprites::{AnimationSprites, Items, SpriteFor};
 use crate::status_bar::{EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
+// TODO:
+// - enemies attacking
+// - player loss / restart
+// - staircases down
+// - player victory
+// - redo help screen
+// - phase walk
+// - time freeze scroll?
+// - rampage scroll?
+// - web page / etc
+
 enum KeyPress<'a> {
     Enter,
     Esc,
