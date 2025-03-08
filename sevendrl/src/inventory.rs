@@ -283,6 +283,19 @@ pub struct Grabbable;
 
 impl Grabbable {
     pub fn try_grab(world: &mut World, location: Vector2<i32>) {
-        //let maybe_grab = world.query::<(Option<&HealthPotion>, Option<&Scroll>, Option<&EnergyPotion>, &OnMap)>()
+        let maybe_grab = world.query::<(&Grabbable, &OnMap)>()
+            .iter().find_map(|(ent, (_, om))| {
+            if om.location == location { Some(ent) } else { None } });
+        if let Some(ent) = maybe_grab {
+            world.remove::<(OnMap, Grabbable)>(ent).unwrap();
+            let (hp, ep, sc) = world.query_one_mut::<(Option<&mut HealthPotion>, Option<&mut EnergyPotion>, Option<&mut Scroll>)>(ent).unwrap();
+            if let Some(hp) = hp {
+                hp.give(world);
+            } else if let Some(ep) = ep {
+                ep.give(world);
+            } else if let Some(sc) = sc {
+                sc.give(world)
+            }
+        }
     }
 }
