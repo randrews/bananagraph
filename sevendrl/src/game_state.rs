@@ -4,15 +4,16 @@ use cgmath::{Point2, Vector2};
 use hecs::{Entity, Query, World};
 use log::info;
 use tinyrand::{Rand, Seeded, Xorshift};
+use wgpu::CompositeAlphaMode::Opaque;
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
-use crate::components::{OnMap, Player};
+use crate::components::{Chest, OnMap, Player};
 use crate::door::Door;
 use crate::enemy::Enemy;
-use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
+use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
-use crate::sprites::{AnimationSprites, SpriteFor};
+use crate::sprites::{AnimationSprites, Items, SpriteFor};
 use crate::status_bar::{EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
@@ -141,13 +142,15 @@ impl GameState {
     pub fn set_map(&mut self, map: VecGrid<CellType>) {
         self.spawn_enemies(&map, 100);
         recreate_terrain(map, &mut self.world);
+        self.spawn_treasure(35);
     }
 
-    pub fn set_player(&mut self, location: impl Into<Vector2<i32>>) {
-        let location = location.into();
+    pub fn set_player(&mut self) {
         // Remove the old player
         let player = self.world.query::<&Player>().iter().map(|(e, _)| e).next();
         player.map(|e| self.world.despawn(e));
+
+        let location = self.random_spots(1)[0];
 
         // Spawn a new player
         self.world.spawn((
@@ -156,6 +159,36 @@ impl GameState {
             OnMap { location, sprite: AnimationSprites::Player1.sprite() },
             BreatheAnimation::new(AnimationSprites::player_breathe())
         ));
+    }
+
+    /// Generate a list of `count` random spots in the grid that don't yet have
+    /// any Solid + OnMap entities in them.
+    pub fn random_spots(&mut self, count: usize) -> Vec<Vector2<i32>> {
+        let mut spots = vec![];
+        // Make a list of all the places the player can't be spawned:
+        let filled_cells: Vec<_> = self.world.query::<(&OnMap, &Solid)>().iter().map(|(_, (om, _))| om.location).collect();
+
+        // Find a random spot not on the list
+        while spots.len() < count {
+            // TODO don't hardcode map dimensions
+            let candidate: Vector2<_> = ((self.rand.next_u32() % 64) as i32, (self.rand.next_u32() % 64) as i32).into();
+            if !filled_cells.contains(&candidate) && !spots.contains(&candidate) {
+                spots.push(candidate)
+            }
+        }
+
+        spots
+    }
+
+    pub fn spawn_treasure(&mut self, count: usize) {
+        for spot in self.random_spots(35) {
+            self.world.spawn((
+                OnMap { location: spot, sprite: Items::Chest.sprite() },
+                Solid,
+                Opaque,
+                Chest::new_rand(&mut self.rand),
+            ));
+        }
     }
 
     pub fn spawn_enemies(&mut self, map: &VecGrid<CellType>, count: u32) {
@@ -237,24 +270,33 @@ impl GameState {
         // Even if we can't move there, if there's a door, bump it:
         Door::try_bump(&mut self.world, new_loc);
 
+        // Also bump chests:
+        Chest::try_bump(&mut self.world, new_loc);
+
         // If all the bumps let us through, actually move:
         if can_move {
             self.get_player::<&mut OnMap>().location = new_loc;
 
             // If there's an enemy in the space beyond our new_loc, splat it:
             let beyond = new_loc.translate(dir);
-            if let Some(ent) = self.find_entities_on_map::<&Enemy>(beyond).first() {
-                self.world.despawn(*ent).unwrap(); // Kill the enemy
+            if let Some(&ent) = self.find_entities_on_map::<&Enemy>(beyond).first() {
+                // What animation should we show?
+                let anim = self.world.query_one::<&Enemy>(ent).unwrap().get().unwrap().death_animation();
+                self.world.despawn(ent).unwrap(); // Kill the enemy
                 // Give the player some energy as a reward
                 if let Some((_, player)) = self.world.query_mut::<&mut Player>().into_iter().next() {
                     player.energy = (player.energy + 1).min(player.max_energy)
                 }
                 // Spawn a one-shot showing the enemy fading
+                let frame = anim.current_frame().unwrap();
                 self.world.spawn((
-                    OneShotAnimation::new(AnimationSprites::enemy_fade()),
-                    OnMap { location: beyond, sprite: AnimationSprites::EnemyFade1.sprite() }
+                    anim,
+                    OnMap { location: beyond, sprite: frame }
                     ));
             }
+
+            // Try to grab things if things are there:
+            Grabbable::try_grab(&mut self.world, new_loc);
         }
     }
 
@@ -266,7 +308,7 @@ impl GameState {
         game_state.seed(seed);
         let map = create_bsp_map((64, 64), 6, &mut game_state.rand);
         game_state.set_map(map);
-        game_state.set_player((4, 2));
+        game_state.set_player();
         game_state.create_status_bar();
         game_state.create_inventory();
         game_state.create_intro_modal();

@@ -76,7 +76,7 @@ fn shove_in_direction(player: Vector2<i32>, dir: impl Into<Vector2<i32>>, map: &
         if !map.contains(curr) || map[curr] == PFCellType::Wall {
             // If we had a moved enemy, he's squished!
             if let Some(PFCellType::Enemy(ent, _)) = moved_enemy {
-                AnimationSprites::enemy_fade_at(world, curr);
+                AnimationSprites::enemy_fade_at(world, ent, curr);
                 get_player_mut(world).give_energy(1);
                 world.despawn(ent).unwrap()
             }
@@ -97,8 +97,13 @@ fn shove_in_direction(player: Vector2<i32>, dir: impl Into<Vector2<i32>>, map: &
             if moved_enemy.is_none() {
                 moved_enemy = Some(PFCellType::Enemy(ent, awake));
                 map[curr] = PFCellType::Clear
+            } else {
+                // If we are, drop him here and grab this current one:
+                let tmp = map[curr];
+                map[curr] = moved_enemy.unwrap();
+                moved_enemy = Some(tmp)
             }
-            // If we are, just move on.
+
         }
 
         // Move along in the direction:

@@ -1,5 +1,6 @@
 use cgmath::Vector2;
 use hecs::{Component, Entity, World};
+use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use crate::components::{OnMap, Player};
 use crate::scrolls::shove_scroll;
@@ -190,6 +191,15 @@ impl Give for Scroll {
 }
 
 impl Scroll {
+    pub fn new_rand(rand: &mut dyn Rand) -> Self {
+        match rand.next_u32() % 3 {
+            0 => Scroll(ScrollType::Shove),
+            1 => Scroll(ScrollType::Leap),
+            2 => Scroll(ScrollType::PhaseWalk),
+            _ => unreachable!()
+        }
+    }
+
     pub fn equip_slot(&self) -> i32 {
         match self.0 {
             ScrollType::PhaseWalk => 2,
@@ -266,4 +276,13 @@ pub fn activate_ability(world: &mut World, slot: char) {
 
     let scroll = *world.query_one::<&Scroll>(scroll_ent.unwrap()).unwrap().get().unwrap();
     scroll.perform(world);
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Grabbable;
+
+impl Grabbable {
+    pub fn try_grab(world: &mut World, location: Vector2<i32>) {
+        //let maybe_grab = world.query::<(Option<&HealthPotion>, Option<&Scroll>, Option<&EnergyPotion>, &OnMap)>()
+    }
 }

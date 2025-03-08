@@ -1,15 +1,32 @@
 use cgmath::Vector2;
 use hecs::{Entity, World};
 use grid::{Grid, VecGrid, bfs, UnreachableError, Coord};
+use crate::animation::OneShotAnimation;
 use crate::components::{OnMap, Player};
+use crate::sprites::AnimationSprites;
 use crate::terrain::{Solid};
 
 #[derive(Copy, Clone, Debug, Default)]
+pub enum EnemyType {
+    #[default]
+    Normal,
+    Mimic
+}
+
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Enemy {
-    pub awake: bool
+    pub awake: bool,
+    pub enemy_type: EnemyType
 }
 
 impl Enemy {
+    pub fn death_animation(&self) -> OneShotAnimation {
+        match self.enemy_type {
+            EnemyType::Normal => OneShotAnimation::new(AnimationSprites::enemy_fade()),
+            EnemyType::Mimic => OneShotAnimation::new(AnimationSprites::mimic_fade()),
+        }
+    }
+
     pub fn system(world: &mut World) {
         OnMap::awaken_enemies(world); // First let's update who can see us
         let mut enemy_map = enemies_map(world);

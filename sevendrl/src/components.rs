@@ -1,10 +1,14 @@
 use cgmath::Vector2;
 use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
 use hecs::World;
+use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite};
-use crate::enemy::Enemy;
-use crate::sprites::{MapCells, SpriteFor};
-use crate::terrain::Opaque;
+use crate::animation::BreatheAnimation;
+use crate::enemy::{Enemy, EnemyType};
+use crate::inventory::{EnergyPotion, Give, Grabbable, HealthPotion, Scroll, ScrollType};
+use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
+use crate::status_bar::set_message;
+use crate::terrain::{Opaque, Solid};
 
 #[derive(Copy, Clone, Debug)]
 pub struct OnMap {
@@ -47,7 +51,8 @@ impl OnMap {
                 (location.x - topleft.x) as f32 * 16.0 + inv_width,
                 (location.y - topleft.y) as f32 * 16.0
             );
-            sprites.push(dc.place(*sprite, local_coords).with_z(0.8));
+            let sprite = if sprite.z == 0.0 { sprite.with_z(0.8) } else { *sprite };
+            sprites.push(dc.place(sprite, local_coords));
 
             // If this isn't in fov, plant an opaque fog sprite on top of it:
             if !fov_map.fov[location.x as usize + location.y as usize * 64usize] { // TODO don't hard code map size
@@ -61,7 +66,7 @@ impl OnMap {
         let player_loc = player_loc(world);
         let fov_map = map_data_for(world, (64, 64), player_loc);
 
-        for (_, (OnMap { location, .. }, Enemy { awake })) in world.query_mut::<(&mut OnMap, &mut Enemy)>().into_iter() {
+        for (_, (OnMap { location, .. }, Enemy { awake, .. })) in world.query_mut::<(&mut OnMap, &mut Enemy)>().into_iter() {
             if fov_map.fov[location.x as usize + location.y as usize * 64usize] { // TODO don't hard code map size
                 *awake = true
             }
@@ -107,4 +112,68 @@ impl Player {
     pub fn give_health(&mut self, delta: u32) {
         self.health = self.max_health.min(self.health + delta)
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Chest {
+    HealthPotion,
+    EnergyPotion,
+    Scroll(ScrollType),
+    Mimic
+}
+
+impl Chest {
+    pub fn new_rand(rand: &mut dyn Rand) -> Self {
+        match rand.next_u32() % 9 {
+            0 | 1 | 2 => Chest::HealthPotion,
+            3 | 4 | 5 => Chest::EnergyPotion,
+            6 | 7 => Chest::Scroll(Scroll::new_rand(rand).0),
+            8 => Chest::Mimic,
+            _ => unreachable!()
+        }
+    }
+
+    pub fn try_bump(world: &mut World, new_loc: Vector2<i32>) {
+        let maybe_chest = world.query::<(&Chest, &OnMap)>().iter().find_map(|(e, (&c, om))| {
+                if om.location == new_loc { Some((e, c)) } else { None }
+        });
+
+        match maybe_chest {
+            None => { } // There's not actually a chest here
+
+            // If we've found a chest here, then bumping it has opened it. What's inside?
+            // Potions, we just turn the chest into a potion:
+            Some((ent, Chest::HealthPotion)) => {
+                _ = world.remove::<(Solid, Chest)>(ent);
+                world.insert(ent, (HealthPotion, Grabbable)).unwrap();
+                world.query_one_mut::<&mut OnMap>(ent).unwrap().sprite = Items::HealthPotion.sprite();
+                set_message(world, "The chest contained a health potion!");
+            }
+
+            Some((ent, Chest::EnergyPotion)) => {
+                _ = world.remove::<(Solid, Chest)>(ent);
+                world.insert(ent, (EnergyPotion, Grabbable)).unwrap();
+                world.query_one_mut::<&mut OnMap>(ent).unwrap().sprite = Items::EnergyPotion.sprite();
+                set_message(world, "The chest contained an energy potion!");
+            }
+
+            Some((ent, Chest::Scroll(scroll_type))) => {
+                _ = world.remove::<(Solid, Chest)>(ent);
+                let scroll = Scroll(scroll_type);
+                world.insert(ent, (scroll, Grabbable)).unwrap();
+                world.query_one_mut::<&mut OnMap>(ent).unwrap().sprite = scroll.inventory_attrs().1;
+                set_message(world, "The chest contained a scroll!");
+            }
+
+            // Mimic!
+            Some((ent, Chest::Mimic)) => {
+                _ = world.remove::<(Chest,)>(ent);
+                let breathe = BreatheAnimation::new(AnimationSprites::mimic_breathe());
+                world.insert(ent, (breathe, Enemy { awake: true, enemy_type: EnemyType::Mimic })).unwrap();
+                set_message(world, "That wasn't a chest, it was a mimic!");
+            }
+            _ => { } // bah
+        }
+    }
+
 }

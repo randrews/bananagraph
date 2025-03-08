@@ -1,9 +1,10 @@
 use cgmath::Vector2;
-use hecs::World;
+use hecs::{Entity, World};
 use bananagraph::{DrawingContext, Sprite};
 use crate::animation::OneShotAnimation;
 use crate::components::OnMap;
-use crate::sprites::AnimationSprites::Shove1;
+use crate::enemy::{Enemy, EnemyType};
+use crate::sprites::AnimationSprites::{Mimic1, MimicFade1, Shove1};
 use crate::terrain::Opaque;
 
 pub trait SpriteFor {
@@ -18,9 +19,15 @@ pub enum AnimationSprites {
     Enemy1, // Enemy breathe frames
     Enemy2,
     Enemy3,
+    Mimic1, // Mimic breathe frames
+    Mimic2,
+    Mimic3,
     EnemyFade1, // Enemy fade animation frames
     EnemyFade2,
     EnemyFade3,
+    MimicFade1, // Mimic fade animation frames
+    MimicFade2,
+    MimicFade3,
     Shove1, // Shove ability effect animation
     Shove2,
     Shove3,
@@ -36,6 +43,16 @@ impl AnimationSprites {
             Enemy3,
             Enemy3,
             Enemy2,
+        ].map(|a| a.sprite()).into_iter().collect()
+    }
+
+    pub fn mimic_breathe() -> Vec<Sprite> {
+        use AnimationSprites::*;
+        [
+            Mimic1,
+            Mimic2,
+            Mimic3,
+            Mimic2,
         ].map(|a| a.sprite()).into_iter().collect()
     }
 
@@ -58,10 +75,22 @@ impl AnimationSprites {
         ].map(|a| a.sprite()).into_iter().collect()
     }
 
-    pub fn enemy_fade_at(world: &mut World, at: impl Into<Vector2<i32>>) {
+    pub fn mimic_fade() -> Vec<Sprite> {
+        use AnimationSprites::*;
+        [
+            MimicFade1, MimicFade2, MimicFade3
+        ].map(|a| a.sprite()).into_iter().collect()
+    }
+
+    pub fn enemy_fade_at(world: &mut World, enemy: Entity, at: impl Into<Vector2<i32>>) {
+        let anim = match world.query_one::<&Enemy>(enemy).unwrap().get().unwrap().enemy_type {
+            EnemyType::Normal => OneShotAnimation::new(Self::enemy_fade()),
+            EnemyType::Mimic => OneShotAnimation::new(Self::mimic_fade()),
+        };
+
         world.spawn((
             OnMap { location: at.into(), sprite: AnimationSprites::EnemyFade1.sprite() },
-            OneShotAnimation::new(Self::enemy_fade()),
+            anim,
             Opaque
             ));
     }
@@ -88,9 +117,17 @@ impl SpriteFor for AnimationSprites {
             Enemy2 => Sprite::new((80, 16), (16, 16)).with_layer(4),
             Enemy3 => Sprite::new((96, 16), (16, 16)).with_layer(4),
 
+            Mimic1 => Sprite::new((128, 16), (16, 16)).with_layer(4),
+            Mimic2 => Sprite::new((144, 16), (16, 16)).with_layer(4),
+            Mimic3 => Sprite::new((160, 16), (16, 16)).with_layer(4),
+
             EnemyFade1 => Sprite::new((128, 96), (16, 16)).with_layer(4),
             EnemyFade2 => Sprite::new((144, 96), (16, 16)).with_layer(4),
             EnemyFade3 => Sprite::new((160, 96), (16, 16)).with_layer(4),
+
+            MimicFade1 => Sprite::new((128, 128), (16, 16)).with_layer(4),
+            MimicFade2 => Sprite::new((144, 128), (16, 16)).with_layer(4),
+            MimicFade3 => Sprite::new((160, 128), (16, 16)).with_layer(4),
 
             Shove1 => Sprite::new((128, 112), (16, 16)).with_layer(4),
             Shove2 => Sprite::new((144, 112), (16, 16)).with_layer(4),
@@ -160,7 +197,8 @@ pub enum Items {
     Scroll1,
     Scroll2,
     Scroll3,
-    Scroll4
+    Scroll4,
+    Chest
 }
 
 impl SpriteFor for Items {
@@ -173,6 +211,7 @@ impl SpriteFor for Items {
             Scroll2 => Sprite::new((48, 112), (16, 16)).with_layer(5),
             Scroll3 => Sprite::new((64, 112), (16, 16)).with_layer(5),
             Scroll4 => Sprite::new((128, 112), (16, 16)).with_layer(5),
+            Chest => Sprite::new((64, 128), (16, 16)).with_z(0.7),
         }
     }
 }
