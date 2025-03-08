@@ -98,6 +98,12 @@ pub trait InventoryWorld {
             ii.index = n;
         }
     }
+
+    fn inventory_full(&mut self) -> bool {
+        let world = self.world();
+        // Inventory limit is a dozen
+        world.query::<&InventoryItem>().iter().count() >= 12
+    }
 }
 
 impl InventoryWorld for World {
@@ -287,6 +293,10 @@ impl Grabbable {
             .iter().find_map(|(ent, (_, om))| {
             if om.location == location { Some(ent) } else { None } });
         if let Some(ent) = maybe_grab {
+            if world.inventory_full() {
+                set_message(world, "Your inventory is full");
+                return
+            }
             world.remove::<(OnMap, Grabbable)>(ent).unwrap();
             let (hp, ep, sc) = world.query_one_mut::<(Option<&mut HealthPotion>, Option<&mut EnergyPotion>, Option<&mut Scroll>)>(ent).unwrap();
             if let Some(hp) = hp {

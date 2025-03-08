@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 use hecs::{Entity, World};
-use grid::{Grid, VecGrid, bfs, UnreachableError, Coord};
+use log::info;
+use grid::{Grid, VecGrid, bfs, UnreachableError, Coord, Dir};
 use crate::animation::OneShotAnimation;
 use crate::components::{OnMap, Player};
 use crate::sprites::AnimationSprites;
@@ -16,8 +17,11 @@ pub enum EnemyType {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Enemy {
     pub awake: bool,
-    pub enemy_type: EnemyType
+    pub enemy_type: EnemyType,
 }
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Dazed;
 
 impl Enemy {
     pub fn death_animation(&self) -> OneShotAnimation {
@@ -53,6 +57,32 @@ impl Enemy {
                 }
             }
         }
+
+        // Anything that was dazed for this round isn't any more:
+        let dazed: Vec<_> = world.query::<&Dazed>().iter().map(|(e, _)| e).collect();
+        for e in dazed {
+            world.remove_one::<Dazed>(e).unwrap();
+        }
+    }
+
+    pub fn try_shove(world: &mut World, location: Vector2<i32>, dir: Dir) -> bool {
+        // First find the enemy at that location, if any:
+        let enemy_ent = world.query::<(&Enemy, &OnMap)>().iter().find_map(|(e, (_, om))| if om.location == location { Some(e) } else { None });
+        if let Some(enemy_ent) = enemy_ent {
+            // Is there a solid cell behind it?
+            let beyond = location.translate(dir);
+            let wall = world.query::<(&OnMap, &Solid)>().iter().any(|(_, (om, _))| om.location == beyond );
+            if !wall {
+                // There's a place to shove! Move this enemy there:
+                world.query_one_mut::<&mut OnMap>(enemy_ent).unwrap().location = beyond;
+                // Daze them so they don't move right back:
+                world.insert(enemy_ent, (Dazed,)).unwrap();
+                // Shove animation:
+                AnimationSprites::shove_at(world, location);
+                return true
+            }
+        }
+        false
     }
 }
 
@@ -71,9 +101,9 @@ pub enum PFCellType {
 pub fn enemies_map(world: &World) -> VecGrid<PFCellType> {
     let mut map = VecGrid::new((64, 64), PFCellType::Clear);
 
-    for (ent, (solid, enemy, onmap)) in world.query::<(Option<&Solid>, Option<&Enemy>, &OnMap)>().iter() {
+    for (ent, (solid, enemy, dazed, onmap)) in world.query::<(Option<&Solid>, Option<&Enemy>, Option<&Dazed>, &OnMap)>().iter() {
         if enemy.is_some() {
-            map[onmap.location] = PFCellType::Enemy(ent, enemy.unwrap().awake) // enemies are all solid so check this first
+            map[onmap.location] = PFCellType::Enemy(ent, enemy.unwrap().awake && dazed.is_none()) // enemies are all solid so check this first
         } else if solid.is_some() {
             map[onmap.location] = PFCellType::Wall
         }

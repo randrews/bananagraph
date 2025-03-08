@@ -81,10 +81,7 @@ pub fn leap_scroll(world: &mut World, rand: &mut impl Rand) {
     // Update the player's loc
     get_player_onmap_mut(world).location = target_cell;
     // Place an animation
-    world.spawn((
-        OneShotAnimation::new(AnimationSprites::shove()),
-        OnMap { location: old, sprite: AnimationSprites::Shove1.sprite() }
-    ));
+    AnimationSprites::shove_at(world, old);
     // Charge them for it
     get_player_mut(world).energy -= cost;
     set_message(world, "You leap to safety!")

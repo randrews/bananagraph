@@ -270,6 +270,10 @@ impl GameState {
         // Even if we can't move there, if there's a door, bump it:
         Door::try_bump(&mut self.world, new_loc);
 
+        // Also try and shove an enemy (this must come before chests, because
+        // chests might become mimics
+        Enemy::try_shove(&mut self.world, new_loc, dir);
+
         // Also bump chests:
         Chest::try_bump(&mut self.world, new_loc);
 
@@ -293,6 +297,8 @@ impl GameState {
                     anim,
                     OnMap { location: beyond, sprite: frame }
                     ));
+            } else {
+
             }
 
             // Try to grab things if things are there:

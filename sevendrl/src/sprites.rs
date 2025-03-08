@@ -95,6 +95,15 @@ impl AnimationSprites {
             ));
     }
 
+    pub fn shove_at(world: &mut World, at: impl Into<Vector2<i32>>) {
+        let at = at.into();
+        let anim = OneShotAnimation::new(Self::shove());
+        world.spawn((
+            anim,
+            OnMap { location: at, sprite: Self::Shove1.sprite() }
+        ));
+    }
+
     pub fn shove() -> Vec<Sprite> {
         use AnimationSprites::*;
         [
