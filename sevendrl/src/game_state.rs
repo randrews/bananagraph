@@ -13,12 +13,12 @@ use crate::door::Door;
 use crate::enemy::{Dazed, Enemy};
 use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
+use crate::scrolls::actually_phasewalk;
 use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
 use crate::status_bar::{set_message, EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
 // TODO:
-// - phase walk
 // - time freeze scroll?
 // - rampage scroll?
 // - web page / etc
@@ -31,20 +31,21 @@ enum KeyPress<'a> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
-enum GameMode {
+pub enum GameMode {
     #[default]
     Normal, // Normally playing the game
     HelpModal, // First page of help modal
     GameOver, // Showing game over dialog; next press should restart things
+    PhaseWalk, // Asking the player which dir to phase walk
 }
 
 #[derive(Default)]
 pub struct GameState {
-    pub(crate) world: World,
-    pub(crate) rand: Xorshift,
-    pub(crate) typeface: Option<Typeface>,
-    pub(crate) mode: GameMode,
-    pub(crate) level: i32
+    pub world: World,
+    pub rand: Xorshift,
+    pub typeface: Option<Typeface>,
+    pub mode: GameMode,
+    pub level: i32
 }
 
 impl WindowEventHandler for GameState {
@@ -137,28 +138,42 @@ impl GameState {
                 return
             }
 
-            match key {
-                KeyPress::Letter("?") => {
-                    self.create_help_modal();
-                    self.mode = GameMode::HelpModal
+            if self.mode == GameMode::PhaseWalk {
+                match key {
+                    KeyPress::Arrow(dir) => {
+                        self.mode = GameMode::Normal;
+                        actually_phasewalk(self, dir);
+                    }
+                    KeyPress::Esc => {
+                        set_message(&mut self.world, "Never mind");
+                        self.mode = GameMode::Normal;
+                    }
+                    _ => {}
                 }
-                KeyPress::Arrow(dir) => {
-                    self.walk(dir);
-                    Enemy::system(&mut self.world);
-                    Dazed::system(&mut self.world);
-                }
-                KeyPress::Letter(s) => {
-                    let c = s.chars().next().unwrap();
-                    if let Some(ent) = self.world.inventory_item_for_key(c) {
-                        activate_item(&mut self.world, ent);
+            } else {
+                match key {
+                    KeyPress::Letter("?") => {
+                        self.create_help_modal();
+                        self.mode = GameMode::HelpModal
+                    }
+                    KeyPress::Arrow(dir) => {
+                        self.walk(dir);
                         Enemy::system(&mut self.world);
                         Dazed::system(&mut self.world);
-                    } else if c == '1' || c == '2' || c == '3' {
-                        activate_ability(&mut self.world, c, &mut self.rand);
-                        Dazed::system(&mut self.world);
                     }
+                    KeyPress::Letter(s) => {
+                        let c = s.chars().next().unwrap();
+                        if let Some(ent) = self.world.inventory_item_for_key(c) {
+                            activate_item(&mut self.world, ent);
+                            Enemy::system(&mut self.world);
+                            Dazed::system(&mut self.world);
+                        } else if c == '1' || c == '2' || c == '3' {
+                            activate_ability(self, c);
+                            Dazed::system(&mut self.world);
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
 
             self.climb_down();
@@ -293,8 +308,8 @@ impl GameState {
         HealthPotion.give(&mut self.world);
         EnergyPotion.give(&mut self.world);
 
+        Scroll(ScrollType::PhaseWalk).give(&mut self.world);
         Scroll(ScrollType::Shove).give(&mut self.world);
-        Scroll(ScrollType::Leap).give(&mut self.world);
     }
 
     // fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {

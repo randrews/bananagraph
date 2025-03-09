@@ -83,17 +83,19 @@ impl AnimationSprites {
         ].map(|a| a.sprite()).into_iter().collect()
     }
 
-    pub fn enemy_fade_at(world: &mut World, enemy: Entity, at: impl Into<Vector2<i32>>) {
+    pub fn enemy_fade_at(world: &mut World, enemy: Entity, at: impl Into<Vector2<i32>>, opaque: bool) {
         let anim = match world.query_one::<&Enemy>(enemy).unwrap().get().unwrap().enemy_type {
             EnemyType::Normal => OneShotAnimation::new(Self::enemy_fade()),
             EnemyType::Mimic => OneShotAnimation::new(Self::mimic_fade()),
         };
-
-        world.spawn((
+        let ent = world.spawn((
             OnMap { location: at.into(), sprite: AnimationSprites::EnemyFade1.sprite() },
-            anim,
-            Opaque
-            ));
+            anim
+        ));
+
+        if opaque {
+            world.insert(ent, (Opaque,)).unwrap()
+        }
     }
 
     pub fn shove_at(world: &mut World, at: impl Into<Vector2<i32>>) {

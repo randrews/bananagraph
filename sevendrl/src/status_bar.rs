@@ -114,16 +114,25 @@ impl EquippedAbilities {
     fn sprites(world: &World, dc: DrawingContext, typeface: &Typeface) -> Vec<Sprite> {
         let mut sprites = vec![];
         if let Some((_, EquippedAbilities { slot1, slot2, slot3 })) = world.query::<&EquippedAbilities>().iter().next() {
-            if let Some(ent) = slot1 {
-                if let Some(scroll) = world.query_one::<&Scroll>(*ent).unwrap().get() {
-                    let (name, sprite) = scroll.inventory_attrs();
-                    sprites.push(dc.place(sprite, StatusBar::tile_coord((18, 0))));
-                    let caption = format!("[1] {}", name);
-                    sprites.append(&mut typeface.print(dc, StatusBar::tile_coord((19, 0)) + Vector2::new(4.0, 11.0), 0.8, caption.as_str()))
-                }
+            if let Some(ent) = *slot1 {
+                sprites.append(&mut Self::draw_slot(world, dc, typeface, ent, 0))
+            }
+            if let Some(ent) = *slot2 {
+                sprites.append(&mut Self::draw_slot(world, dc, typeface, ent, 1))
             }
         }
 
+        sprites
+    }
+
+    fn draw_slot(world: &World, dc: DrawingContext, typeface: &Typeface, ent: Entity, index: i32) -> Vec<Sprite> {
+        let mut sprites = vec![];
+        if let Some(scroll) = world.query_one::<&Scroll>(ent).unwrap().get() {
+            let (name, sprite) = scroll.inventory_attrs();
+            sprites.push(dc.place(sprite, StatusBar::tile_coord((18, index))));
+            let caption = format!("[{}] {}", index + 1, name);
+            sprites.append(&mut typeface.print(dc, StatusBar::tile_coord((19, index)) + Vector2::new(4.0, 11.0), 0.8, caption.as_str()))
+        }
         sprites
     }
 }

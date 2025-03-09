@@ -1,16 +1,19 @@
 use cgmath::Vector2;
 use hecs::World;
 use tinyrand::Rand;
-use grid::{Coord, Grid, VecGrid};
+use grid::{Coord, Dir, Grid, VecGrid};
 use crate::animation::OneShotAnimation;
 use crate::components::{player_loc, OnMap, Player};
 use crate::enemy::{enemies_map, Enemy, PFCellType};
+use crate::game_state::{GameMode, GameState};
 use crate::inventory::Scroll;
-use crate::inventory::ScrollType::{Leap, Shove};
+use crate::inventory::ScrollType::{Leap, PhaseWalk, Shove};
+use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::set_message;
 
-pub fn shove_scroll(world: &mut World) {
+pub fn shove_scroll(game_state: &mut GameState) {
+    let world = &mut game_state.world;
     let player = player_loc(world);
     let mut enemies = enemies_map(world);
 
@@ -52,7 +55,9 @@ pub fn shove_scroll(world: &mut World) {
 }
 
 /// A leap scroll teleports you to a random free space within your vision
-pub fn leap_scroll(world: &mut World, rand: &mut impl Rand) {
+pub fn leap_scroll(game_state: &mut GameState) {
+    let world = &mut game_state.world;
+    let rand = &mut game_state.rand;
     let cost = Scroll(Leap).cost();
     if get_player(world).energy < cost {
         set_message(world, format!("Need {} energy to leap", cost).as_str());
@@ -87,8 +92,70 @@ pub fn leap_scroll(world: &mut World, rand: &mut impl Rand) {
     set_message(world, "You leap to safety!")
 }
 
-pub fn phasewalk_scroll(world: &mut World) {
+pub fn phasewalk_scroll(game_state: &mut GameState) {
+    // This is the first step, where we ask the player which direction. Just set the gs' mode:
+    game_state.mode = GameMode::PhaseWalk;
+    set_message(&mut game_state.world, "Which direction? [esc to cancel]")
+}
 
+pub fn actually_phasewalk(game_state: &mut GameState, dir: Dir) {
+    let world = &mut game_state.world;
+
+    let cost = Scroll(PhaseWalk).cost();
+    if get_player(world).energy < cost {
+        set_message(world, format!("Need {} energy to phasewalk", cost).as_str());
+        return
+    }
+    get_player_mut(world).energy -= cost;
+
+    let enemies = enemies_map(world);
+    let player_loc = player_loc(world);
+    let mut dead = vec![];
+    let mut dead_locs = vec![];
+    let mut curr = player_loc;
+
+    loop {
+        curr = curr.translate(dir);
+        match enemies.get(curr) {
+            None | Some(PFCellType::Wall) => {
+                // off map / wall, dead
+                game_state.mode = GameMode::GameOver;
+                create_phase_modal(world);
+                break
+            }
+            Some(PFCellType::Enemy(ent, ..)) => {
+                // Add killed enemy to dead list
+                dead.push(*ent);
+                dead_locs.push(curr);
+            }
+            Some(PFCellType::Clear) | _ => {
+                // Done, player is here now
+                break
+            }
+        }
+    }
+
+    get_player_onmap_mut(world).location = curr;
+    if dead.len() == 1 {
+        set_message(world, "Phase walked through 1 enemy!");
+    } else {
+        set_message(world, format!("Phase walked through {} enemies!", dead.len()).as_str());
+    }
+
+    for (n, ent) in dead.into_iter().enumerate() {
+        AnimationSprites::enemy_fade_at(world, ent, dead_locs[n], false);
+        world.despawn(ent).unwrap();
+    }
+}
+
+pub fn create_phase_modal(world: &mut World) {
+    world.spawn((Modal::new((15, 6), vec![
+        ContentType::Center(String::from("You have died")),
+        ContentType::Text(String::from("Your phase walked into a solid object! You")),
+        ContentType::Text(String::from("rematerialize in the wall, dying instantly,")),
+        ContentType::Text(String::from("and are part of the dungeon forever.")),
+        ContentType::Center(String::from("-= press any key to restart =-")),
+    ], DismissType::Any),));
 }
 
 fn visible_cells(world: &World) -> Vec<Vector2<i32>> {
@@ -134,7 +201,7 @@ fn shove_in_direction(player: Vector2<i32>, dir: impl Into<Vector2<i32>>, map: &
         if !map.contains(curr) || map[curr] == PFCellType::Wall {
             // If we had a moved enemy, he's squished!
             if let Some(PFCellType::Enemy(ent, _)) = moved_enemy {
-                AnimationSprites::enemy_fade_at(world, ent, curr);
+                AnimationSprites::enemy_fade_at(world, ent, curr, true);
                 get_player_mut(world).give_energy(1);
                 world.despawn(ent).unwrap()
             }
