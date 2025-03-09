@@ -19,7 +19,6 @@ use crate::terrain::{recreate_terrain, Solid};
 
 // TODO:
 // - staircases down
-// - player victory
 // - phase walk
 // - time freeze scroll?
 // - rampage scroll?
@@ -167,8 +166,12 @@ impl GameState {
     }
 
     pub fn game_over(&mut self) {
-        if self.world.query::<&Player>().iter().next().unwrap().1.health == 0 {
+        let &player = self.world.query::<&Player>().iter().next().unwrap().1;
+        if player.health == 0 {
             self.create_gameover_modal();
+            self.mode = GameMode::GameOver
+        } else if player.energy >= 12 {
+            self.create_victory_modal();
             self.mode = GameMode::GameOver
         }
     }
@@ -371,6 +374,16 @@ impl GameState {
             ContentType::Text(String::from("fortune, and more potions, on your next")),
             ContentType::Text(String::from("attempt!")),
             ContentType::Center(String::from("-= press any key to restart =-")),
+        ], DismissType::Any),));
+    }
+
+    fn create_victory_modal(&mut self) {
+        self.world.spawn((Modal::new((15, 6), vec![
+            ContentType::Center(String::from("You are ready to be a Monk")),
+            ContentType::Text(String::from("Your have attained the energy focus required")),
+            ContentType::Text(String::from("of a Monk of Sevendral, and are ready to join")),
+            ContentType::Text(String::from("the order! Congratulations on your victory!")),
+            ContentType::Center(String::from("-= press any key to play again =-")),
         ], DismissType::Any),));
     }
 
