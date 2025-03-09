@@ -20,10 +20,10 @@ use crate::terrain::{recreate_terrain, Solid};
 // TODO:
 // - staircases down
 // - player victory
-// - redo help screen
 // - phase walk
 // - time freeze scroll?
 // - rampage scroll?
+// - crystals
 // - web page / etc
 
 enum KeyPress<'a> {
@@ -37,6 +37,7 @@ enum KeyPress<'a> {
 enum GameMode {
     #[default]
     Normal, // Normally playing the game
+    HelpModal, // First page of help modal
     GameOver, // Showing game over dialog; next press should restart things
 }
 
@@ -128,6 +129,9 @@ impl GameState {
             if self.mode == GameMode::GameOver {
                 // We have just closed the gameover dialog, so should recreate a map:
                 self.start_game();
+            } else if self.mode == GameMode::HelpModal {
+                self.mode = GameMode::Normal;
+                self.create_help2_modal();
             }
         } else {
             // First, is there a one-shot animation going? Let's ignore input until it finishes:
@@ -137,7 +141,8 @@ impl GameState {
 
             match key {
                 KeyPress::Letter("?") => {
-                    self.create_help_modal()
+                    self.create_help_modal();
+                    self.mode = GameMode::HelpModal
                 }
                 KeyPress::Arrow(dir) => {
                     self.walk(dir);
@@ -366,7 +371,7 @@ impl GameState {
             ContentType::Text(String::from("Your have succumbed to your wounds. Better")),
             ContentType::Text(String::from("fortune, and more potions, on your next")),
             ContentType::Text(String::from("attempt!")),
-            ContentType::Center(String::from("-= press any key =-")),
+            ContentType::Center(String::from("-= press any key to restart =-")),
         ], DismissType::Any),));
     }
 
@@ -375,9 +380,9 @@ impl GameState {
             ContentType::Center(String::from("Welcome, Adventurer!")),
             ContentType::Text(["You aspire to be one of the fabled Monks of",
                 "Sevendral! To prove your honor to the order,",
-                "you are to search this dungeon for the fabled",
-                "Amulet of Sevendral, which some careless",
-                "butterfingers apparently dropped down here.",
+                "you are to train in this dungeon until you",
+                "have the required degree of energy focus,",
+                "which they say is twelve.",
                 "",
                 "Good luck!"].join("\n")),
             ContentType::Center(String::from("-= press any key =-")),
@@ -409,6 +414,22 @@ impl GameState {
             ContentType::Center(String::from("-= press any key =-")),
         ], DismissType::Any),));
     }
+
+    fn create_help2_modal(&mut self) {
+        self.world.spawn((Modal::new((22, 6), vec![
+            ContentType::Center(String::from("How to play (cont)")),
+            ContentType::Text([
+                "- Bumping an enemy with space behind him shoves him back, giving you",
+                "  a chance to attack.",
+            ].join("\n")),
+            ContentType::Text([
+                "- Picking up a duplicate scroll increases your energy level, and your",
+                "  chances of joining the Monks!"
+            ].join("\n")),
+            ContentType::Center(String::from("-= press any key =-")),
+        ], DismissType::Any),));
+    }
+
 }
 
 /// Glue to convert bgraph's dir to grid's
