@@ -4,6 +4,7 @@ use log::info;
 use grid::{Grid, VecGrid, bfs, UnreachableError, Coord, Dir};
 use crate::animation::OneShotAnimation;
 use crate::components::{OnMap, Player};
+use crate::scrolls::TimeFreezeEffect;
 use crate::sprites::AnimationSprites;
 use crate::terrain::{Solid};
 
@@ -42,6 +43,8 @@ impl Enemy {
     }
 
     pub fn system(world: &mut World) {
+        if TimeFreezeEffect::time_freeze_remaining(world).is_some() { return } // Nothing happens while time is frozen
+
         Enemy::attack_system(world);
 
         OnMap::awaken_enemies(world); // First let's update who can see us

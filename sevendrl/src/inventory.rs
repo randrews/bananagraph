@@ -4,7 +4,7 @@ use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use crate::components::{OnMap, Player, Powerup};
 use crate::game_state::GameState;
-use crate::scrolls::{leap_scroll, phasewalk_scroll, shove_scroll};
+use crate::scrolls::{leap_scroll, phasewalk_scroll, shove_scroll, time_freeze};
 use crate::sprites::{Items, SpriteFor, UiFrame};
 use crate::status_bar::{set_message, EquippedAbilities};
 
@@ -201,6 +201,7 @@ pub enum ScrollType {
     PhaseWalk,
     Leap,
     Shove,
+    TimeFreeze,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -212,16 +213,18 @@ impl Give for Scroll {
             ScrollType::PhaseWalk => ("Phase Walk", Items::Scroll1.sprite()),
             ScrollType::Leap => ("Leap", Items::Scroll2.sprite()),
             ScrollType::Shove => ("Shove", Items::Scroll3.sprite()),
+            ScrollType::TimeFreeze => ("Freeze Time", Items::Scroll4.sprite()),
         }
     }
 }
 
 impl Scroll {
     pub fn new_rand(rand: &mut dyn Rand) -> Self {
-        match rand.next_u32() % 3 {
+        match rand.next_u32() % 4 {
             0 => Scroll(ScrollType::Shove),
             1 => Scroll(ScrollType::Leap),
             2 => Scroll(ScrollType::PhaseWalk),
+            3 => Scroll(ScrollType::TimeFreeze),
             _ => unreachable!()
         }
     }
@@ -229,6 +232,7 @@ impl Scroll {
     pub fn equip_slot(&self) -> i32 {
         match self.0 {
             ScrollType::PhaseWalk => 1,
+            ScrollType::TimeFreeze => 1,
             ScrollType::Leap => 0,
             ScrollType::Shove => 0,
         }
@@ -238,13 +242,16 @@ impl Scroll {
         match self.0 {
             ScrollType::PhaseWalk => phasewalk_scroll(game_state),
             ScrollType::Leap => leap_scroll(game_state),
-            ScrollType::Shove => shove_scroll(game_state)
+            ScrollType::Shove => shove_scroll(game_state),
+            ScrollType::TimeFreeze => time_freeze(game_state)
+
         }
     }
 
     pub fn cost(&self) -> u32 {
         match self.0 {
             ScrollType::PhaseWalk => 5,
+            ScrollType::TimeFreeze => 6,
             ScrollType::Leap => 1,
             ScrollType::Shove => 2
         }

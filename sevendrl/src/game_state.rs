@@ -13,15 +13,10 @@ use crate::door::Door;
 use crate::enemy::{Dazed, Enemy};
 use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
-use crate::scrolls::actually_phasewalk;
+use crate::scrolls::{actually_phasewalk, TimeFreezeEffect};
 use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
 use crate::status_bar::{set_message, EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
-
-// TODO:
-// - time freeze scroll?
-// - rampage scroll?
-// - web page / etc
 
 enum KeyPress<'a> {
     Enter,
@@ -160,6 +155,7 @@ impl GameState {
                         self.walk(dir);
                         Enemy::system(&mut self.world);
                         Dazed::system(&mut self.world);
+                        TimeFreezeEffect::system(&mut self.world);
                     }
                     KeyPress::Letter(s) => {
                         let c = s.chars().next().unwrap();
@@ -167,9 +163,11 @@ impl GameState {
                             activate_item(&mut self.world, ent);
                             Enemy::system(&mut self.world);
                             Dazed::system(&mut self.world);
+                            TimeFreezeEffect::system(&mut self.world);
                         } else if c == '1' || c == '2' || c == '3' {
                             activate_ability(self, c);
                             Dazed::system(&mut self.world);
+                            TimeFreezeEffect::system(&mut self.world);
                         }
                     }
                     _ => {}
@@ -247,7 +245,7 @@ impl GameState {
         for e in ents { self.world.despawn(e).unwrap() }
     }
 
-    /// Generate a list of `count` random spots in the grid that don't yet have
+    /// Generate a list of `count` unique random spots in the grid that don't yet have
     /// any Solid + OnMap entities in them.
     pub fn random_spots(&mut self, count: usize) -> Vec<Vector2<i32>> {
         let mut spots = vec![];
@@ -267,7 +265,7 @@ impl GameState {
     }
 
     pub fn spawn_treasure(&mut self, count: usize) {
-        for spot in self.random_spots(35) {
+        for spot in self.random_spots(count) {
             self.world.spawn((
                 OnMap { location: spot, sprite: Items::Chest.sprite() },
                 Solid,
@@ -306,10 +304,6 @@ impl GameState {
     pub fn create_inventory(&mut self) {
         self.world.spawn((Inventory {},));
         HealthPotion.give(&mut self.world);
-        EnergyPotion.give(&mut self.world);
-
-        Scroll(ScrollType::PhaseWalk).give(&mut self.world);
-        Scroll(ScrollType::Shove).give(&mut self.world);
     }
 
     // fn find_on_map<Q: Query>(&mut self, loc: impl Into<Vector2<i32>>) -> Vec<(Entity, <Q as Query>::Item<'_>)> {
@@ -481,7 +475,7 @@ impl GameState {
     }
 
     fn create_help2_modal(&mut self) {
-        self.world.spawn((Modal::new((22, 6), vec![
+        self.world.spawn((Modal::new((22, 9), vec![
             ContentType::Center(String::from("How to play (cont)")),
             ContentType::Text([
                 "- Bumping an enemy with space behind him shoves him back, giving you",
@@ -491,6 +485,9 @@ impl GameState {
                 "- Picking up a duplicate scroll increases your energy level, and your",
                 "  chances of joining the Monks!"
             ].join("\n")),
+            ContentType::Center(String::from("---")),
+            ContentType::Text(String::from("Game by Ross Andrews, March 2025")),
+            ContentType::Text(String::from("Art by VEXED: v3x3d.itch.io")),
             ContentType::Center(String::from("-= press any key =-")),
         ], DismissType::Any),));
     }

@@ -5,6 +5,7 @@ use bananagraph::{DrawingContext, Sprite, Typeface};
 use grid::Coord;
 use crate::components::{player_loc, OnMap, Player, Stairs};
 use crate::inventory::{Give, Scroll};
+use crate::scrolls::TimeFreezeEffect;
 use crate::sprites::UiFrame;
 
 #[derive(Clone)]
@@ -66,9 +67,17 @@ impl StatusBar {
 
         sprites.append(&mut EquippedAbilities::sprites(world, dc, typeface));
 
-        let stairs_loc = world.query::<(&OnMap, &Stairs)>().iter().next().unwrap().1.0.location;
-        let dist = player_loc(world).dist_to(stairs_loc);
-        let message = format!("Stairs are {} away", dist.floor());
+        let message = if let Some(duration) = TimeFreezeEffect::time_freeze_remaining(world) {
+            if duration == 1 {
+                format!("Time frozen for {} more turn", duration)
+            } else {
+                format!("Time frozen for {} more turns", duration)
+            }
+        } else {
+            let stairs_loc = world.query::<(&OnMap, &Stairs)>().iter().next().unwrap().1.0.location;
+            let dist = player_loc(world).dist_to(stairs_loc);
+            format!("Stairs are {} away", dist.floor())
+        };
         sprites.append(&mut typeface.print(dc, Self::tile_coord((19, 2)) + Vector2::new(0.0, 11.0), 0.5, message.as_str()));
 
         sprites

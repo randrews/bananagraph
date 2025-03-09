@@ -2,6 +2,8 @@ use bananagraph::Sprite;
 use std::time::Duration;
 use hecs::World;
 use crate::components::OnMap;
+use crate::enemy::Enemy;
+use crate::scrolls::TimeFreezeEffect;
 
 #[derive(Clone, Debug)]
 pub struct BreatheAnimation {
@@ -34,7 +36,9 @@ impl BreatheAnimation {
     }
 
     pub fn system(world: &mut World, dt: Duration) {
-        for (_, (breathe, on_map)) in world.query_mut::<(&mut BreatheAnimation, &mut OnMap)>() {
+        let frozen = TimeFreezeEffect::time_freeze_remaining(world).is_some();
+        for (_, (breathe, on_map, enemy)) in world.query_mut::<(&mut BreatheAnimation, &mut OnMap, Option<&Enemy>)>() {
+            if frozen && enemy.is_some() { continue } // Enemies are frozen!
             breathe.timer += dt;
             on_map.sprite = breathe.current_frame();
         }

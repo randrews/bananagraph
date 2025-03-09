@@ -7,7 +7,7 @@ use crate::components::{player_loc, OnMap, Player};
 use crate::enemy::{enemies_map, Enemy, PFCellType};
 use crate::game_state::{GameMode, GameState};
 use crate::inventory::Scroll;
-use crate::inventory::ScrollType::{Leap, PhaseWalk, Shove};
+use crate::inventory::ScrollType::{Leap, PhaseWalk, Shove, TimeFreeze};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::sprites::{AnimationSprites, SpriteFor};
 use crate::status_bar::set_message;
@@ -156,6 +156,48 @@ pub fn create_phase_modal(world: &mut World) {
         ContentType::Text(String::from("and are part of the dungeon forever.")),
         ContentType::Center(String::from("-= press any key to restart =-")),
     ], DismissType::Any),));
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TimeFreezeEffect(i32);
+
+impl TimeFreezeEffect {
+    pub fn time_freeze_remaining(world: &World) -> Option<i32> {
+        world.query::<&TimeFreezeEffect>().iter().next().map(|(_, &tf)| tf.0)
+    }
+
+    pub fn system(world: &mut World) {
+        let q = world.query_mut::<&mut TimeFreezeEffect>().into_iter().next();
+        let mut finished_eff = None;
+        if let Some((e, effect)) = q {
+            effect.0 -= 1;
+            if effect.0 == 0 {
+                finished_eff = Some(e)
+            }
+        }
+
+        finished_eff.map(|e| world.despawn(e).unwrap());
+    }
+}
+
+pub fn time_freeze(game_state: &mut GameState) {
+    let world = &mut game_state.world;
+
+    let cost = Scroll(TimeFreeze).cost();
+    if get_player(world).energy < cost {
+        set_message(world, format!("Need {} energy to freeze time", cost).as_str());
+        return
+    }
+
+    if TimeFreezeEffect::time_freeze_remaining(world).is_some() {
+        set_message(world, "Time is already frozen!");
+        return
+    }
+
+    get_player_mut(world).energy -= cost;
+
+    // The time freeze system will fire _this_ round also, so to get the full 10 turns...
+    world.spawn((TimeFreezeEffect(11),));
 }
 
 fn visible_cells(world: &World) -> Vec<Vector2<i32>> {
