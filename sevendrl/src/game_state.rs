@@ -18,8 +18,6 @@ use crate::status_bar::{EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
 // TODO:
-// - enemies attacking
-// - player loss / restart
 // - staircases down
 // - player victory
 // - redo help screen
@@ -35,11 +33,19 @@ enum KeyPress<'a> {
     Arrow(Dir),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
+enum GameMode {
+    #[default]
+    Normal, // Normally playing the game
+    GameOver, // Showing game over dialog; next press should restart things
+}
+
 #[derive(Default)]
 pub struct GameState {
     pub(crate) world: World,
     pub(crate) rand: Xorshift,
     pub(crate) typeface: Option<Typeface>,
+    pub(crate) mode: GameMode
 }
 
 impl WindowEventHandler for GameState {
@@ -117,6 +123,12 @@ impl GameState {
             if modal.dismiss == DismissType::Any {
                 self.world.despawn(ent).unwrap()
             }
+
+            // Was that the game over modal?
+            if self.mode == GameMode::GameOver {
+                // We have just closed the gameover dialog, so should recreate a map:
+                self.start_game();
+            }
         } else {
             // First, is there a one-shot animation going? Let's ignore input until it finishes:
             if self.world.query::<&OneShotAnimation>().iter().next().is_some() {
@@ -145,6 +157,15 @@ impl GameState {
                 }
                 _ => {}
             }
+
+            self.game_over();
+        }
+    }
+
+    pub fn game_over(&mut self) {
+        if self.world.query::<&Player>().iter().next().unwrap().1.health == 0 {
+            self.create_gameover_modal();
+            self.mode = GameMode::GameOver
         }
     }
 
@@ -318,19 +339,35 @@ impl GameState {
         }
     }
 
+    pub fn start_game(&mut self) {
+        let map = create_bsp_map((64, 64), 6, &mut self.rand);
+        self.world.clear();
+        self.mode = GameMode::Normal;
+        self.set_map(map);
+        self.set_player();
+        self.create_status_bar();
+        self.create_inventory();
+        self.create_intro_modal();
+    }
+
     // Gotta shut clippy up about this because it's only called in a fn that's only visible
     // to wasm32.
     #[allow(dead_code)]
     pub fn new(seed: u64) -> Self {
         let mut game_state = Self::default();
         game_state.seed(seed);
-        let map = create_bsp_map((64, 64), 6, &mut game_state.rand);
-        game_state.set_map(map);
-        game_state.set_player();
-        game_state.create_status_bar();
-        game_state.create_inventory();
-        game_state.create_intro_modal();
+        game_state.start_game();
         game_state
+    }
+
+    fn create_gameover_modal(&mut self) {
+        self.world.spawn((Modal::new((15, 6), vec![
+            ContentType::Center(String::from("You have died")),
+            ContentType::Text(String::from("Your have succumbed to your wounds. Better")),
+            ContentType::Text(String::from("fortune, and more potions, on your next")),
+            ContentType::Text(String::from("attempt!")),
+            ContentType::Center(String::from("-= press any key =-")),
+        ], DismissType::Any),));
     }
 
     fn create_intro_modal(&mut self) {
