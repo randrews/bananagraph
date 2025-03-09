@@ -25,7 +25,7 @@ pub struct Terrain;
 
 /// Given a VecGrid<char> of the map, recreates all terrain in the world (after despawning
 /// the preexisting Terrain entities).
-pub fn recreate_terrain(map: VecGrid<CellType>, world: &mut World) {
+pub fn recreate_terrain(map: &VecGrid<CellType>, world: &mut World) {
     // Despawn everything that's a Terrain
     let terrain: Vec<Entity> = world.query::<(&Terrain,)>().iter().map(|x| x.0).collect();
     for e in terrain {

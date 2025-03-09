@@ -224,14 +224,15 @@ impl SpriteFor for Items {
             Scroll3 => Sprite::new((64, 112), (16, 16)).with_layer(5),
             Scroll4 => Sprite::new((128, 112), (16, 16)).with_layer(5),
             Chest => Sprite::new((64, 128), (16, 16)).with_z(0.7),
-            Crystal => Sprite::new((32, 160), (16, 16)).with_layer(5).with_z(0.7),
-            Mushroom => Sprite::new((48, 128), (16, 16)).with_layer(5).with_z(0.7),
+            Crystal => Sprite::new((32, 160), (16, 16)).with_layer(5),
+            Mushroom => Sprite::new((48, 128), (16, 16)).with_layer(5),
         }
     }
 }
 
 pub enum MapCells {
     Fog,
+    Stairs,
 }
 
 impl SpriteFor for MapCells {
@@ -239,6 +240,7 @@ impl SpriteFor for MapCells {
         use MapCells::*;
         match self {
             Fog => Sprite::new((80, 64), (16, 16)),
+            Stairs => Sprite::new((32, 112), (16, 16)).with_z(0.79)
         }
     }
 }

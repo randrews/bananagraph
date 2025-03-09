@@ -2,7 +2,8 @@ use cgmath::Vector2;
 use hecs::{Entity, World};
 use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
-use crate::components::Player;
+use grid::Coord;
+use crate::components::{player_loc, OnMap, Player, Stairs};
 use crate::inventory::{Give, Scroll};
 use crate::sprites::UiFrame;
 
@@ -64,6 +65,12 @@ impl StatusBar {
         }
 
         sprites.append(&mut EquippedAbilities::sprites(world, dc, typeface));
+
+        let stairs_loc = world.query::<(&OnMap, &Stairs)>().iter().next().unwrap().1.0.location;
+        let dist = player_loc(world).dist_to(stairs_loc);
+        let message = format!("Stairs are {} away", dist.floor());
+        sprites.append(&mut typeface.print(dc, Self::tile_coord((19, 2)) + Vector2::new(0.0, 11.0), 0.5, message.as_str()));
+
         sprites
     }
 

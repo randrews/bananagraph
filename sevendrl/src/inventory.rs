@@ -106,8 +106,20 @@ pub trait InventoryWorld {
     }
 
     fn has_scroll_of_type(&self, scroll_type: ScrollType) -> bool {
-        for (_, (ii, ea, Scroll(st))) in self.world().query::<(Option<&InventoryItem>, Option<&EquippedAbilities>, &Scroll)>().iter() {
-            if (ii.is_some() || ea.is_some()) && *st == scroll_type { return true }
+        for (_, (ii, Scroll(st))) in self.world().query::<(Option<&InventoryItem>, &Scroll)>().iter() {
+            if ii.is_some() && *st == scroll_type { return true }
+        }
+
+        if let Some((_, &ea)) = self.world().query::<&EquippedAbilities>().iter().next() {
+            if let Some(s) = ea.slot1 {
+                if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
+            }
+            if let Some(s) = ea.slot2 {
+                if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
+            }
+            if let Some(s) = ea.slot3 {
+                if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
+            }
         }
         false
     }
@@ -300,25 +312,7 @@ impl Grabbable {
             .iter().find_map(|(ent, (_, om))| {
             if om.location == location { Some(ent) } else { None } });
         if let Some(ent) = maybe_grab {
-            if world.inventory_full() {
-                set_message(world, "Your inventory is full");
-                return
-            }
-            world.remove::<(OnMap, Grabbable)>(ent).unwrap();
-            if let Some(&hp) = world.query_one_mut::<Option<&HealthPotion>>(ent).unwrap() {
-                hp.give(world);
-            } else if let Some(&ep) = world.query_one_mut::<Option<&EnergyPotion>>(ent).unwrap() {
-                ep.give(world);
-            } else if let Some(&sc) = world.query_one_mut::<Option<&Scroll>>(ent).unwrap() {
-                if world.has_scroll_of_type(sc.0) {
-                    set_message(world, "You already have this scroll, so your focus increases");
-                    let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
-                    player.energy += 1;
-                    player.max_energy += 1;
-                } else {
-                    sc.give(world)
-                }
-            } else if let Some(&pu) = world.query_one_mut::<Option<&Powerup>>(ent).unwrap() {
+            if let Some(&pu) = world.query_one_mut::<Option<&Powerup>>(ent).unwrap() {
                 let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
                 match pu {
                     Powerup::Mushroom => {
@@ -334,6 +328,27 @@ impl Grabbable {
                     }
                 }
                 world.despawn(ent).unwrap()
+            } else {
+                if world.inventory_full() {
+                    set_message(world, "Your inventory is full");
+                    return
+                }
+                world.remove::<(OnMap, Grabbable)>(ent).unwrap();
+
+                if let Some(&hp) = world.query_one_mut::<Option<&HealthPotion>>(ent).unwrap() {
+                    hp.give(world);
+                } else if let Some(&ep) = world.query_one_mut::<Option<&EnergyPotion>>(ent).unwrap() {
+                    ep.give(world);
+                } else if let Some(&sc) = world.query_one_mut::<Option<&Scroll>>(ent).unwrap() {
+                    if world.has_scroll_of_type(sc.0) {
+                        set_message(world, "You already have this scroll, so your focus increases");
+                        let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
+                        player.energy += 1;
+                        player.max_energy += 1;
+                    } else {
+                        sc.give(world)
+                    }
+                }
             }
         }
     }

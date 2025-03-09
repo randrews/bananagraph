@@ -8,17 +8,16 @@ use wgpu::CompositeAlphaMode::Opaque;
 use bananagraph::{GpuWrapper, IdBuffer, Sprite, Typeface, TypefaceBuilder, WindowEventHandler};
 use grid::{create_bsp_map, CellType, Coord, Dir, Grid, VecGrid};
 use crate::animation::{BreatheAnimation, OneShotAnimation};
-use crate::components::{Chest, OnMap, Player};
+use crate::components::{player_loc, Chest, OnMap, Player, Stairs};
 use crate::door::Door;
 use crate::enemy::{Dazed, Enemy};
 use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
 use crate::modal::{ContentType, DismissType, Modal};
-use crate::sprites::{AnimationSprites, Items, SpriteFor};
-use crate::status_bar::{EquippedAbilities, StatusBar};
+use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
+use crate::status_bar::{set_message, EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
 // TODO:
-// - staircases down
 // - phase walk
 // - time freeze scroll?
 // - rampage scroll?
@@ -44,7 +43,8 @@ pub struct GameState {
     pub(crate) world: World,
     pub(crate) rand: Xorshift,
     pub(crate) typeface: Option<Typeface>,
-    pub(crate) mode: GameMode
+    pub(crate) mode: GameMode,
+    pub(crate) level: i32
 }
 
 impl WindowEventHandler for GameState {
@@ -161,7 +161,16 @@ impl GameState {
                 _ => {}
             }
 
+            self.climb_down();
             self.game_over();
+        }
+    }
+
+    pub fn climb_down(&mut self) {
+        let player_loc = player_loc(&self.world);
+        if self.world.query::<(&OnMap, &Stairs)>().iter().any(|(e, (&om, _))| om.location == player_loc) {
+            self.next_level();
+            set_message(&mut self.world, format!("You climb down to level {}", self.level).as_str());
         }
     }
 
@@ -182,9 +191,10 @@ impl GameState {
     }
 
     pub fn set_map(&mut self, map: VecGrid<CellType>) {
-        self.spawn_enemies(&map, 100);
-        recreate_terrain(map, &mut self.world);
-        self.spawn_treasure(35);
+        recreate_terrain(&map, &mut self.world);
+        self.spawn_enemies(&map, (self.level * 30) as u32);
+        self.spawn_treasure((self.level * 10) as usize);
+        self.spawn_stairs();
     }
 
     pub fn set_player(&mut self) {
@@ -201,6 +211,25 @@ impl GameState {
             OnMap { location, sprite: AnimationSprites::Player1.sprite() },
             BreatheAnimation::new(AnimationSprites::player_breathe())
         ));
+    }
+
+    fn place_player(&mut self) {
+        let location = self.random_spots(1)[0];
+        self.world.query::<(&Player, &mut OnMap)>().iter().next().unwrap().1.1.location = location
+    }
+
+    fn spawn_stairs(&mut self) {
+        let location = self.random_spots(1)[0];
+        self.world.spawn((
+            OnMap { location, sprite: MapCells::Stairs.sprite() },
+            Stairs
+        ));
+    }
+
+    /// Clear the world of anything with an OnMap other than the player
+    fn clear_map(&mut self) {
+        let ents: Vec<_> = self.world.query::<(&OnMap, Option<&Player>)>().iter().filter_map(|(e, (_, p))| if p.is_none() { Some(e) } else { None }).collect();
+        for e in ents { self.world.despawn(e).unwrap() }
     }
 
     /// Generate a list of `count` random spots in the grid that don't yet have
@@ -348,6 +377,7 @@ impl GameState {
 
     pub fn start_game(&mut self) {
         let map = create_bsp_map((64, 64), 6, &mut self.rand);
+        self.level = 1;
         self.world.clear();
         self.mode = GameMode::Normal;
         self.set_map(map);
@@ -355,6 +385,14 @@ impl GameState {
         self.create_status_bar();
         self.create_inventory();
         self.create_intro_modal();
+    }
+
+    pub fn next_level(&mut self) {
+        let map = create_bsp_map((64, 64), 6, &mut self.rand);
+        self.level += 1;
+        self.clear_map();
+        self.set_map(map);
+        self.place_player();
     }
 
     // Gotta shut clippy up about this because it's only called in a fn that's only visible
@@ -415,7 +453,7 @@ impl GameState {
             ContentType::CenterSprite(Sprite::new((154, 0), (48, 32)).with_layer(2)),
             ContentType::Text([
                 "- Ability scrolls allow special moves and combos. Activate equipped abilities",
-                "  with [1], [2], or [3]"
+                "  with [1] or [2]"
             ].join("\n")),
             ContentType::CenterSprite(Sprite::new((64, 112), (16, 16)).with_layer(5)),
             ContentType::Text([

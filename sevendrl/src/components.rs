@@ -3,6 +3,7 @@ use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
 use hecs::{Entity, World};
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite};
+use grid::Coord;
 use crate::animation::BreatheAnimation;
 use crate::enemy::{Dazed, Enemy, EnemyType};
 use crate::inventory::{EnergyPotion, Give, Grabbable, HealthPotion, Scroll, ScrollType};
@@ -59,6 +60,7 @@ impl OnMap {
                 sprites.push(dc.place(fog, local_coords))
             }
         }
+
         sprites
     }
 
@@ -198,3 +200,6 @@ impl Chest {
         }
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct Stairs;
