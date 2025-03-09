@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
-use hecs::World;
+use hecs::{Entity, World};
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite};
 use crate::animation::BreatheAnimation;
@@ -118,17 +118,27 @@ impl Player {
 pub enum Chest {
     HealthPotion,
     EnergyPotion,
+    Crystal,
+    Mushroom,
     Scroll(ScrollType),
     Mimic
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum Powerup {
+    Crystal,
+    Mushroom
+}
+
 impl Chest {
     pub fn new_rand(rand: &mut dyn Rand) -> Self {
-        match rand.next_u32() % 9 {
+        match rand.next_u32() % 13 {
             0 | 1 | 2 => Chest::HealthPotion,
             3 | 4 | 5 => Chest::EnergyPotion,
             6 | 7 => Chest::Scroll(Scroll::new_rand(rand).0),
-            8 => Chest::Mimic,
+            8 | 9 => Chest::Mushroom,
+            10 | 11 => Chest::Crystal,
+            12 => Chest::Mimic,
             _ => unreachable!()
         }
     }
@@ -173,7 +183,18 @@ impl Chest {
                 world.insert(ent, (breathe, Enemy { awake: true, enemy_type: EnemyType::Mimic }, Dazed)).unwrap();
                 set_message(world, "That wasn't a chest, it was a mimic!");
             }
-            _ => { } // bah
+
+            // Powerups
+            Some((ent, Chest::Crystal)) => {
+                _ = world.remove::<(Chest,Solid)>(ent);
+                world.query_one_mut::<&mut OnMap>(ent).unwrap().sprite = Items::Crystal.sprite();
+                world.insert(ent, (Grabbable, Powerup::Crystal)).unwrap();
+            }
+            Some((ent, Chest::Mushroom)) => {
+                _ = world.remove::<(Chest,Solid)>(ent);
+                world.query_one_mut::<&mut OnMap>(ent).unwrap().sprite = Items::Mushroom.sprite();
+                world.insert(ent, (Grabbable, Powerup::Mushroom)).unwrap();
+            }
         }
     }
 }

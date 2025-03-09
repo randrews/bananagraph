@@ -23,7 +23,6 @@ use crate::terrain::{recreate_terrain, Solid};
 // - phase walk
 // - time freeze scroll?
 // - rampage scroll?
-// - crystals
 // - web page / etc
 
 enum KeyPress<'a> {

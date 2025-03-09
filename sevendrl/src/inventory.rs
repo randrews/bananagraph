@@ -2,7 +2,7 @@ use cgmath::Vector2;
 use hecs::{Component, Entity, World};
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite, Typeface};
-use crate::components::{OnMap, Player};
+use crate::components::{OnMap, Player, Powerup};
 use crate::scrolls::{leap_scroll, phasewalk_scroll, shove_scroll};
 use crate::sprites::{Items, SpriteFor, UiFrame};
 use crate::status_bar::{set_message, EquippedAbilities};
@@ -318,6 +318,22 @@ impl Grabbable {
                 } else {
                     sc.give(world)
                 }
+            } else if let Some(&pu) = world.query_one_mut::<Option<&Powerup>>(ent).unwrap() {
+                let player = world.query_mut::<&mut Player>().into_iter().next().unwrap().1;
+                match pu {
+                    Powerup::Mushroom => {
+                        // remember one heart is two health
+                        player.max_health = 24.min(player.max_health + 2);
+                        player.health = player.max_health.min(player.health + 2);
+                        set_message(world, "Eating the mushroom makes you feel stronger!")
+                    }
+                    Powerup::Crystal => {
+                        player.max_energy = 12.min(player.max_energy + 1);
+                        player.energy = player.max_energy.min(player.energy + 1);
+                        set_message(world, "Gazing into the crystal, you feel more magically attuned!")
+                    }
+                }
+                world.despawn(ent).unwrap()
             }
         }
     }

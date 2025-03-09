@@ -5,6 +5,7 @@ use crate::animation::OneShotAnimation;
 use crate::components::OnMap;
 use crate::enemy::{Enemy, EnemyType};
 use crate::sprites::AnimationSprites::{Mimic1, MimicFade1, Shove1};
+use crate::sprites::Items::Crystal;
 use crate::terrain::Opaque;
 
 pub trait SpriteFor {
@@ -207,7 +208,9 @@ pub enum Items {
     Scroll2,
     Scroll3,
     Scroll4,
-    Chest
+    Chest,
+    Crystal,
+    Mushroom
 }
 
 impl SpriteFor for Items {
@@ -221,6 +224,8 @@ impl SpriteFor for Items {
             Scroll3 => Sprite::new((64, 112), (16, 16)).with_layer(5),
             Scroll4 => Sprite::new((128, 112), (16, 16)).with_layer(5),
             Chest => Sprite::new((64, 128), (16, 16)).with_z(0.7),
+            Crystal => Sprite::new((32, 160), (16, 16)).with_layer(5).with_z(0.7),
+            Mushroom => Sprite::new((48, 128), (16, 16)).with_layer(5).with_z(0.7),
         }
     }
 }
