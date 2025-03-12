@@ -64,7 +64,7 @@ impl OneShotAnimation {
     pub fn current_frame(&self) -> Option<Sprite> {
         let t = self.timer.as_millis() as usize;
         let idx = t / self.rate.as_millis() as usize;
-        self.frames.get(idx).map(|f| *f)
+        self.frames.get(idx).copied()
     }
 
     pub fn system(world: &mut World, dt: Duration) {

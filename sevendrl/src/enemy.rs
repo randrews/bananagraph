@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use hecs::{Entity, World};
-use log::info;
 use grid::{Grid, VecGrid, bfs, UnreachableError, Coord, Dir};
 use crate::animation::OneShotAnimation;
 use crate::components::{OnMap, Player};
@@ -55,7 +54,7 @@ impl Enemy {
             let c = enemy_map.coord(n as usize);
 
             if let PFCellType::Enemy(ent, true) = enemy_map[c] {
-                if let Ok(mut path) = best_path(&mut enemy_map, player_loc, c) {
+                if let Ok(mut path) = best_path(&enemy_map, player_loc, c) {
                     // We have a path to the player!
                     // First cell in our path is where we're at, last cell is the player let's drop those.
                     path.remove(0);
@@ -139,7 +138,7 @@ fn best_path(enemy_map: &VecGrid<PFCellType>, player_loc: Vector2<i32>, enemy_lo
 
     // Let's see if there's a free one-move for us that's also ortho to the player:
     let empty_next_to_player = |c: &Vector2<i32>| c.orthogonal(player_loc) && enemy_map[*c] == PFCellType::Clear;
-    if let Some(tgt) = enemy_map.adjacent_coords(enemy_loc).filter(empty_next_to_player).next() {
+    if let Some(tgt) = enemy_map.adjacent_coords(enemy_loc).find(empty_next_to_player) {
         // There is! Move there:
         return Ok(vec![enemy_loc, tgt])
     }

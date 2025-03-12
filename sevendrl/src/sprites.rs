@@ -4,8 +4,6 @@ use bananagraph::{DrawingContext, Sprite};
 use crate::animation::OneShotAnimation;
 use crate::components::OnMap;
 use crate::enemy::{Enemy, EnemyType};
-use crate::sprites::AnimationSprites::{Mimic1, MimicFade1, Shove1};
-use crate::sprites::Items::Crystal;
 use crate::terrain::Opaque;
 
 pub trait SpriteFor {

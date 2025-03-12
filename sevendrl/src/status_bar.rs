@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use hecs::{Entity, World};
-use log::info;
 use bananagraph::{DrawingContext, Sprite, Typeface};
 use grid::Coord;
 use crate::components::{player_loc, OnMap, Player, Stairs};
@@ -116,13 +115,12 @@ pub fn set_message(world: &mut World, message: &str) {
 pub struct EquippedAbilities {
     pub slot1: Option<Entity>,
     pub slot2: Option<Entity>,
-    pub slot3: Option<Entity>,
 }
 
 impl EquippedAbilities {
     fn sprites(world: &World, dc: DrawingContext, typeface: &Typeface) -> Vec<Sprite> {
         let mut sprites = vec![];
-        if let Some((_, EquippedAbilities { slot1, slot2, slot3 })) = world.query::<&EquippedAbilities>().iter().next() {
+        if let Some((_, EquippedAbilities { slot1, slot2 })) = world.query::<&EquippedAbilities>().iter().next() {
             if let Some(ent) = *slot1 {
                 sprites.append(&mut Self::draw_slot(world, dc, typeface, ent, 0))
             }

@@ -95,7 +95,7 @@ pub trait InventoryWorld {
         let mut indices: Vec<_> = world.query_mut::<&mut InventoryItem>().into_iter().collect();
         indices.sort_by(|a, b| a.1.index.cmp(&b.1.index));
 
-        for (n, (ent, ii)) in indices.into_iter().enumerate() {
+        for (n, (_, ii)) in indices.into_iter().enumerate() {
             ii.index = n;
         }
     }
@@ -116,9 +116,6 @@ pub trait InventoryWorld {
                 if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
             }
             if let Some(s) = ea.slot2 {
-                if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
-            }
-            if let Some(s) = ea.slot3 {
                 if self.world().query_one::<&Scroll>(s).unwrap().get().unwrap().0 == scroll_type { return true }
             }
         }
@@ -267,7 +264,6 @@ impl TryActivate for Scroll {
                 match scroll.equip_slot() {
                     0 => equipped.slot1,
                     1 => equipped.slot2,
-                    2 => equipped.slot3,
                     _ => equipped.slot1,
                 };
 
@@ -275,7 +271,6 @@ impl TryActivate for Scroll {
             match scroll.equip_slot() {
                 0 => equipped.slot1 = Some(entity),
                 1 => equipped.slot2 = Some(entity),
-                2 => equipped.slot3 = Some(entity),
                 _ => equipped.slot1 = Some(entity),
             }
 
@@ -299,7 +294,6 @@ pub fn activate_ability(game_state: &mut GameState, slot: char) {
     let scroll_ent = match slot {
         '1' => equipped.slot1,
         '2' => equipped.slot2,
-        '3' => equipped.slot3,
         _ => equipped.slot1
     };
 

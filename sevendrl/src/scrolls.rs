@@ -68,7 +68,7 @@ pub fn leap_scroll(game_state: &mut GameState) {
         // So first we need a list of spaces in your vision:
         let mut visible = visible_cells(world);
         let enemies = enemies_map(world);
-        let mut c = None;
+        let mut c;
         loop {
             if visible.is_empty() {
                 set_message(world, "Nowhere to leap to!");
@@ -128,7 +128,7 @@ pub fn actually_phasewalk(game_state: &mut GameState, dir: Dir) {
                 dead.push(*ent);
                 dead_locs.push(curr);
             }
-            Some(PFCellType::Clear) | _ => {
+            _ => {
                 // Done, player is here now
                 break
             }
@@ -176,7 +176,9 @@ impl TimeFreezeEffect {
             }
         }
 
-        finished_eff.map(|e| world.despawn(e).unwrap());
+        if let Some(e) = finished_eff {
+            world.despawn(e).unwrap()
+        }
     }
 }
 

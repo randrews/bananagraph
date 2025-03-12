@@ -11,7 +11,7 @@ use crate::animation::{BreatheAnimation, OneShotAnimation};
 use crate::components::{player_loc, Chest, OnMap, Player, Stairs};
 use crate::door::Door;
 use crate::enemy::{Dazed, Enemy};
-use crate::inventory::{activate_ability, activate_item, EnergyPotion, Give, Grabbable, HealthPotion, Inventory, InventoryWorld, Scroll, ScrollType};
+use crate::inventory::{activate_ability, activate_item, Give, Grabbable, HealthPotion, Inventory, InventoryWorld};
 use crate::modal::{ContentType, DismissType, Modal};
 use crate::scrolls::{actually_phasewalk, TimeFreezeEffect};
 use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
@@ -181,7 +181,7 @@ impl GameState {
 
     pub fn climb_down(&mut self) {
         let player_loc = player_loc(&self.world);
-        if self.world.query::<(&OnMap, &Stairs)>().iter().any(|(e, (&om, _))| om.location == player_loc) {
+        if self.world.query::<(&OnMap, &Stairs)>().iter().any(|(_, (&om, _))| om.location == player_loc) {
             self.next_level();
             set_message(&mut self.world, format!("You climb down to level {}", self.level).as_str());
         }

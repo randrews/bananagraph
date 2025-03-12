@@ -1,9 +1,8 @@
 use cgmath::Vector2;
 use doryen_fov::{FovAlgorithm, FovRecursiveShadowCasting, MapData};
-use hecs::{Entity, World};
+use hecs::World;
 use tinyrand::Rand;
 use bananagraph::{DrawingContext, Sprite};
-use grid::Coord;
 use crate::animation::BreatheAnimation;
 use crate::enemy::{Dazed, Enemy, EnemyType};
 use crate::inventory::{EnergyPotion, Give, Grabbable, HealthPotion, Scroll, ScrollType};
@@ -111,9 +110,6 @@ impl Player {
     pub fn give_energy(&mut self, delta: u32) {
         self.energy = self.max_energy.min(self.energy + delta)
     }
-    pub fn give_health(&mut self, delta: u32) {
-        self.health = self.max_health.min(self.health + delta)
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -135,8 +131,8 @@ pub enum Powerup {
 impl Chest {
     pub fn new_rand(rand: &mut dyn Rand) -> Self {
         match rand.next_u32() % 13 {
-            0 | 1 | 2 => Chest::HealthPotion,
-            3 | 4 | 5 => Chest::EnergyPotion,
+            0..=2 => Chest::HealthPotion,
+            3..=5 => Chest::EnergyPotion,
             6 | 7 => Chest::Scroll(Scroll::new_rand(rand).0),
             8 | 9 => Chest::Mushroom,
             10 | 11 => Chest::Crystal,
