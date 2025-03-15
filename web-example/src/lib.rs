@@ -60,5 +60,5 @@ pub async fn init_gpu_wrapper(canvas_id: &str) -> JsGpuWrapper {
 pub fn draw_toast(mut wrapper: JsGpuWrapper) {
     wrapper.add_texture(include_bytes!("angrytoast.png"), Some("angrytoast.png"));
     let toast = Sprite::new((0, 0), (320, 240)).with_id(1);
-    let ids = wrapper.redraw_with_ids([toast]).unwrap();
+    wrapper.redraw_with_ids([toast]).unwrap();
 }

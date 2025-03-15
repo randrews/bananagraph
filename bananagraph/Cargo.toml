@@ -10,4 +10,3 @@ winit = { version = "0.30.9" }
 image = "0.25.4"
 cgmath = "0.18.0"
 pollster = "0.3.0"
-log = "0.4.22"

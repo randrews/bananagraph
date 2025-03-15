@@ -1,8 +1,7 @@
-use bananagraph::{Click, DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use bananagraph::{Click, DrawingContext, ElementState, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use cgmath::num_traits::Pow;
 use cgmath::{Point2, Vector2};
 use rand::Rng;
-use winit::event::ElementState;
 use grid::{Coord, Grid, GridMut};
 use crate::board::{Board, Cell};
 use crate::iso_map::{AsSprite, IsoMap};

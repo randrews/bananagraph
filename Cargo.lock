@@ -251,7 +251,6 @@ dependencies = [
  "bytemuck",
  "cgmath",
  "image",
- "log",
  "pollster",
  "wgpu",
  "winit",
