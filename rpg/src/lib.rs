@@ -1,4 +1,5 @@
 mod game_state;
+mod components;
 
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
