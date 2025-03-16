@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut, Index};
 use std::time::Duration;
 use crate::{Click, Dir, ElementState, GpuWrapper, IdBuffer, MouseButton, WindowEventHandler};
 use wasm_bindgen::prelude::wasm_bindgen;
+use crate::event_handler::KeyEvent;
 
 /// We can't send a GpuWrapper to JS directly without it trying to generate stuff it can't generate
 /// so we need to wrap it in a bindgen'd type so we can tell bindgen to skip it. We also can't expose
@@ -87,23 +88,7 @@ impl JsGpuWrapper {
     }
 
     pub fn key(&mut self, key: &str) {
-        // TODO this is horribly wrong. This is the default impl of `key` in WindowEventHandler,
-        // which consumes winit key events. We need to translate js key events into something we
-        // can call key with, which means we need to refactor key to not expect winit events...
-        // But as long as the 7drl game doesn't need "raw" kbd handling this is fine.
-        match key {
-            "ArrowDown" => self.handler.arrow_key(Dir::South),
-            "ArrowUp" => self.handler.arrow_key(Dir::North),
-            "ArrowLeft" => self.handler.arrow_key(Dir::West),
-            "ArrowRight" => self.handler.arrow_key(Dir::East),
-            "Enter" => self.handler.enter_key(),
-            "Escape" => self.handler.esc_key(),
-            _ => {
-                if key.len() == 1 {
-                    self.handler.letter_key(key.chars().next().unwrap())
-                }
-            }
-        }
+        to_banana_key(key).map(|ev| self.handler.key(ev));
     }
 
     pub fn redraw(&mut self, dt: f64) {
@@ -112,5 +97,28 @@ impl JsGpuWrapper {
         // so exiting the game just means closing the tab, which we have no control over.
         self.handler.tick(dt);
         self.ids = self.handler.redraw((0.0, 0.0).into(), &self.wrapper)
+    }
+}
+
+fn to_banana_key(key: &str) -> Option<KeyEvent> {
+    match key {
+        "ArrowDown" => Some(KeyEvent::Arrow(Dir::South)),
+        "ArrowUp" => Some(KeyEvent::Arrow(Dir::North)),
+        "ArrowLeft" => Some(KeyEvent::Arrow(Dir::West)),
+        "ArrowRight" => Some(KeyEvent::Arrow(Dir::East)),
+        "Enter" => Some(KeyEvent::Enter),
+        "Escape" => Some(KeyEvent::Esc),
+        _ => {
+            // Turn the string into chars, which are unicode scalar values, which isn't
+            // perfect but is better than using bytes or something.
+            // If there's exactly one (extremely normal case, US keyboard letter key)
+            // then wrap it as an event and return it
+            let ch: Vec<_> = key.chars().collect();
+            if ch.len() == 1 {
+                Some(KeyEvent::Letter(ch[0]))
+            } else {
+                None
+            }
+        }
     }
 }

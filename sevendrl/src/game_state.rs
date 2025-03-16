@@ -18,10 +18,10 @@ use crate::sprites::{AnimationSprites, Items, MapCells, SpriteFor};
 use crate::status_bar::{set_message, EquippedAbilities, StatusBar};
 use crate::terrain::{recreate_terrain, Solid};
 
-enum KeyPress<'a> {
+enum KeyPress {
     Enter,
     Esc,
-    Letter(&'a str),
+    Letter(char),
     Arrow(Dir),
 }
 
@@ -93,7 +93,7 @@ impl WindowEventHandler for GameState {
         OneShotAnimation::system(&mut self.world, dt);
     }
 
-    fn letter_key(&mut self, letter: &str) {
+    fn letter_key(&mut self, letter: char) {
         self.handle_key(KeyPress::Letter(letter))
     }
 
@@ -147,7 +147,7 @@ impl GameState {
                 }
             } else {
                 match key {
-                    KeyPress::Letter("?") => {
+                    KeyPress::Letter('?') => {
                         self.create_help_modal();
                         self.mode = GameMode::HelpModal
                     }
@@ -157,8 +157,7 @@ impl GameState {
                         Dazed::system(&mut self.world);
                         TimeFreezeEffect::system(&mut self.world);
                     }
-                    KeyPress::Letter(s) => {
-                        let c = s.chars().next().unwrap();
+                    KeyPress::Letter(c) => {
                         if let Some(ent) = self.world.inventory_item_for_key(c) {
                             activate_item(&mut self.world, ent);
                             Enemy::system(&mut self.world);

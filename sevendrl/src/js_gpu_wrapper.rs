@@ -93,7 +93,7 @@ impl JsGpuWrapper {
             "Escape" => self.handler.esc_key(),
             _ => {
                 if key.len() == 1 {
-                    self.handler.letter_key(key)
+                    self.handler.letter_key(key.chars().next().unwrap())
                 }
             }
         }

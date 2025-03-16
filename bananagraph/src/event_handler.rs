@@ -61,7 +61,7 @@ pub trait WindowEventHandler {
     /// (from winit, anyway) key events and handle more. But, if you override this,
     /// you'll need to handle calling arrow_key, enter_key, etc yourself if you want
     /// to use those as well.
-    fn key(&mut self, event: KeyEvent, _is_synthetic: bool) {
+    fn key(&mut self, event: KeyEvent) {
         match event {
             KeyEvent::Letter(c) => self.letter_key(c),
             KeyEvent::Enter => self.enter_key(),

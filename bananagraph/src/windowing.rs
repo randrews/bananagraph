@@ -129,12 +129,12 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
             }
 
             // Key pressed or released
-            WindowEvent::KeyboardInput { device_id: _, event, is_synthetic } => {
+            WindowEvent::KeyboardInput { device_id: _, event, .. } => {
                 // We can ignore release events...
                 if event.state == winit::event::ElementState::Released { return }
 
                 let banana_event = to_banana_key(event);
-                banana_event.map(|e| self.handler.key(e, is_synthetic));
+                banana_event.map(|e| self.handler.key(e));
             }
 
             _ => {} // toss the others
