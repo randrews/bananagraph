@@ -17,3 +17,9 @@ pub use typeface::{Typeface, Glyph, TypefaceBuilder, AddTexture};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use windowing::{run_window};
+
+#[cfg(feature = "web")]
+mod js_gpu_wrapper;
+
+#[cfg(feature = "web")]
+pub use js_gpu_wrapper::JsGpuWrapper;

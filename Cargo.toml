@@ -5,7 +5,10 @@ members = [
     "grid",
     "map_editor",
     "matcha",
-    "roguelike", "sevendrl",
+    "roguelike", "rpg", "sevendrl",
     "text",
     "web-example"]
 resolver = "2"
+
+[profile.release]
+strip = true

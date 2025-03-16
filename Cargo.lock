@@ -252,6 +252,7 @@ dependencies = [
  "cgmath",
  "image",
  "pollster",
+ "wasm-bindgen",
  "wgpu",
  "winit",
 ]
@@ -2062,6 +2063,26 @@ dependencies = [
  "grid",
  "hecs",
  "pollster",
+]
+
+[[package]]
+name = "rpg"
+version = "0.1.0"
+dependencies = [
+ "bananagraph",
+ "cgmath",
+ "console_error_panic_hook",
+ "console_log",
+ "doryen-fov",
+ "grid",
+ "hecs",
+ "instant",
+ "log",
+ "tinyrand",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "wgpu",
 ]
 
 [[package]]

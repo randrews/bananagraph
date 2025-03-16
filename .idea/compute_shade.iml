@@ -12,6 +12,7 @@
       <sourceFolder url="file://$MODULE_DIR$/roguelike/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/web-example/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/sevendrl/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rpg/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/bananagraph/target" />
       <excludeFolder url="file://$MODULE_DIR$/map_editor/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />

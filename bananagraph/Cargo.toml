@@ -3,6 +3,11 @@ name = "bananagraph"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+# Features that require a random number generator
+web = ["dep:wasm-bindgen"]
+
 [dependencies]
 wgpu = { version="24.0.1", default-features = false, features = ["webgl", "wgsl", "metal"] }
 bytemuck = { version = "1.17.1", features = ["derive"] }
@@ -10,3 +15,4 @@ winit = { version = "0.30.9" }
 image = "0.25.4"
 cgmath = "0.18.0"
 pollster = "0.3.0"
+wasm-bindgen = { version = "0.2", optional = true }
