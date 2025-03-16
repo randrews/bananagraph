@@ -1,7 +1,5 @@
 use std::time::Duration;
 use cgmath::Point2;
-use winit::event::KeyEvent;
-use winit::keyboard::{Key, NamedKey};
 use crate::{GpuWrapper, IdBuffer, SpriteId};
 
 #[derive(Copy,Clone,Debug,PartialEq)]
@@ -20,6 +18,14 @@ pub struct Click {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Dir { North, South, East, West }
+
+#[derive(Clone, PartialEq)]
+pub enum KeyEvent {
+    Letter(char),
+    Enter,
+    Esc,
+    Arrow(Dir)
+}
 
 /// A trait for handling game-level events. Bananagraph can keep track of the winit event loop
 /// and translate its events into something more game-level semantic. These all have default
@@ -56,19 +62,11 @@ pub trait WindowEventHandler {
     /// you'll need to handle calling arrow_key, enter_key, etc yourself if you want
     /// to use those as well.
     fn key(&mut self, event: KeyEvent, _is_synthetic: bool) {
-        // We can ignore release events...
-        if event.state == winit::event::ElementState::Released { return }
-
-        match event.logical_key {
-            Key::Named(NamedKey::ArrowDown) => self.arrow_key(Dir::South),
-            Key::Named(NamedKey::ArrowUp) => self.arrow_key(Dir::North),
-            Key::Named(NamedKey::ArrowLeft) => self.arrow_key(Dir::West),
-            Key::Named(NamedKey::ArrowRight) => self.arrow_key(Dir::East),
-            Key::Named(NamedKey::Enter) => self.enter_key(),
-            Key::Named(NamedKey::Escape) => self.esc_key(),
-            Key::Character(s) => self.letter_key(s.as_str()),
-            Key::Named(NamedKey::Space) => self.letter_key(" "),
-            _ => {}
+        match event {
+            KeyEvent::Letter(c) => self.letter_key(c),
+            KeyEvent::Enter => self.enter_key(),
+            KeyEvent::Esc => self.esc_key(),
+            KeyEvent::Arrow(dir) => self.arrow_key(dir)
         }
     }
 
@@ -83,5 +81,5 @@ pub trait WindowEventHandler {
 
     /// Called when any printable key is pressed, with the string of what was typed. This
     /// can include shift chars like @, unicode characters from non-US keyboards, etc.
-    fn letter_key(&mut self, _s: &str) {}
+    fn letter_key(&mut self, _c: char) {}
 }

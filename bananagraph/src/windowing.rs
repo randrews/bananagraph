@@ -5,14 +5,15 @@ use cgmath::{Point2, Vector2};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::error::EventLoopError;
-use winit::event::{StartCause, WindowEvent};
+use winit::event::{KeyEvent, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes, WindowId};
-use crate::{GpuWrapper, IdBuffer};
+use crate::{Dir, GpuWrapper, IdBuffer};
 use crate::event_handler::{Click, ElementState, MouseButton, WindowEventHandler};
 
 /// A struct that can impl ApplicationHandler for winit to send it events
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "desktop")]
 struct App<'a, H> {
     /// The window can't be owned by App because it owns the GpuWrapper, which borrows the window (surface).
     /// So we store it in an Arc
@@ -39,7 +40,7 @@ struct App<'a, H> {
     id_buffer: Option<IdBuffer>
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "desktop")]
 impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
     // When the timer fires, redraw thw window and restart the timer (update will go here)
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
@@ -129,7 +130,11 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
 
             // Key pressed or released
             WindowEvent::KeyboardInput { device_id: _, event, is_synthetic } => {
-                self.handler.key(event, is_synthetic);
+                // We can ignore release events...
+                if event.state == winit::event::ElementState::Released { return }
+
+                let banana_event = to_banana_key(event);
+                banana_event.map(|e| self.handler.key(e, is_synthetic));
             }
 
             _ => {} // toss the others
@@ -137,7 +142,26 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+fn to_banana_key(event: KeyEvent) -> Option<crate::event_handler::KeyEvent> {
+    use crate::event_handler::KeyEvent;
+
+    match event.logical_key {
+        Key::Named(NamedKey::ArrowDown) => Some(KeyEvent::Arrow(Dir::South)),
+        Key::Named(NamedKey::ArrowUp) => Some(KeyEvent::Arrow(Dir::North)),
+        Key::Named(NamedKey::ArrowLeft) => Some(KeyEvent::Arrow(Dir::West)),
+        Key::Named(NamedKey::ArrowRight) => Some(KeyEvent::Arrow(Dir::East)),
+        Key::Named(NamedKey::Enter) => Some(KeyEvent::Enter),
+        Key::Named(NamedKey::Escape) => Some(KeyEvent::Esc),
+        Key::Character(s) => {
+            s.chars().next().map(|c| KeyEvent::Letter(c))
+        },
+        Key::Named(NamedKey::Space) => Some(KeyEvent::Letter(' ')),
+        _ => None
+    }
+
+}
+
+#[cfg(feature = "desktop")]
 pub async fn run_window(title: &str, initial_size: Vector2<u32>, min_size: Vector2<u32>, handler: impl WindowEventHandler) -> Result<(), EventLoopError> {
     let event_loop = winit::event_loop::EventLoop::new().expect("Failed to create event loop!");
     event_loop.set_control_flow(ControlFlow::Wait);

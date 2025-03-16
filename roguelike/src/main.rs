@@ -75,8 +75,8 @@ impl WindowEventHandler for GameState {
         self.walk(convert_dir(dir))
     }
 
-    fn letter_key(&mut self, s: &str) {
-        println!("typed: [{}]", s)
+    fn letter_key(&mut self, c: char) {
+        println!("typed: [{}]", c)
     }
 }
 

@@ -4,7 +4,6 @@ mod scale_transform;
 mod sprite;
 mod texture;
 mod drawing_context;
-mod windowing;
 mod typeface;
 mod event_handler;
 
@@ -15,8 +14,11 @@ pub use drawing_context::DrawingContext;
 pub use event_handler::{Click, WindowEventHandler, MouseButton, Dir, ElementState};
 pub use typeface::{Typeface, Glyph, TypefaceBuilder, AddTexture};
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use windowing::{run_window};
+#[cfg(feature = "desktop")]
+mod windowing;
+
+#[cfg(feature = "desktop")]
+pub use windowing::run_window;
 
 #[cfg(feature = "web")]
 mod js_gpu_wrapper;

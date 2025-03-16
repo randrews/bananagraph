@@ -2076,7 +2076,6 @@ dependencies = [
  "doryen-fov",
  "grid",
  "hecs",
- "instant",
  "log",
  "tinyrand",
  "wasm-bindgen",

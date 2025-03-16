@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = []
+default = ["desktop"]
 # Features that require a random number generator
 web = ["dep:wasm-bindgen"]
+desktop = ["dep:winit"]
 
 [dependencies]
 wgpu = { version="24.0.1", default-features = false, features = ["webgl", "wgsl", "metal"] }
 bytemuck = { version = "1.17.1", features = ["derive"] }
-winit = { version = "0.30.9" }
+winit = { version = "0.30.9", optional = true }
 image = "0.25.4"
 cgmath = "0.18.0"
 pollster = "0.3.0"

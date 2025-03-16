@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-bananagraph = { path = "../bananagraph", features = ["web"] }
+bananagraph = { path = "../bananagraph", features = ["web"], default-features = false }
 grid = { path = "../grid" }
 cgmath = "0.18.0"
 console_error_panic_hook = "0.1.6"
@@ -24,7 +24,7 @@ log = "0.4.22"
 wgpu = { version="24.0.1", default-features = false, features = ["webgl"] }
 
 # Needed pro tem to fix the "could not resolve env" bug
-instant = { version = "0.1.12", features = ["wasm-bindgen"] }
+# instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 
 hecs = "0.10.5"
 tinyrand = "0.5.0"
