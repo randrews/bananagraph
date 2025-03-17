@@ -1,7 +1,8 @@
 mod traits;
 mod on_map;
 mod visible;
-mod animation;
+mod breathe_animation;
+mod one_shot_animation;
 
 pub use traits::*;
 pub use on_map::{OnMap, Loc, find_at, exists_at};

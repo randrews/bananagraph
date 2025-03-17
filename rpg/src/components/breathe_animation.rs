@@ -1,8 +1,7 @@
 use bananagraph::Sprite;
 use std::time::Duration;
 use hecs::World;
-use crate::components::{Frozen, OnMap};
-use crate::components::visible::Visible;
+use crate::components::{Frozen, Visible};
 
 /// An animation that runs a list of sprite frames in a loop. A breathe animation has three
 /// qualities:
@@ -102,44 +101,3 @@ mod tests {
         assert_eq!(*w.query_one::<&Visible>(frozen).unwrap().get().unwrap(), Visible(frames()[0]));
     }
 }
-
-/*
-#[derive(Clone, Debug)]
-pub struct OneShotAnimation {
-    frames: Vec<Sprite>,
-    rate: Duration,
-    timer: Duration
-}
-
-impl OneShotAnimation {
-    pub fn new(frames: Vec<Sprite>) -> Self {
-        Self {
-            frames,
-            rate: Duration::from_millis(80),
-            timer: Duration::from_millis(0)
-        }
-    }
-
-    pub fn current_frame(&self) -> Option<Sprite> {
-        let t = self.timer.as_millis() as usize;
-        let idx = t / self.rate.as_millis() as usize;
-        self.frames.get(idx).copied()
-    }
-
-    pub fn system(world: &mut World, dt: Duration) {
-        let mut graveyard = vec![];
-        for (ent, (anim, on_map)) in world.query_mut::<(&mut OneShotAnimation, &mut OnMap)>() {
-            anim.timer += dt;
-            if let Some(frame) = anim.current_frame() {
-                on_map.sprite = frame;
-            } else {
-                graveyard.push(ent);
-            }
-        }
-
-        for e in graveyard.into_iter() {
-            world.despawn(e).unwrap()
-        }
-    }
-}
-*/
