@@ -31,10 +31,6 @@ impl OneShotAnimation {
         self.frames.get(idx).copied()
     }
 
-    pub fn increment_timer(&mut self, dt: Duration) {
-        self.timer += dt
-    }
-
     /// Run the animations:
     /// - Anything `Visible` and not `Frozen` will get updated
     /// - Anything that's displayed all the frames gets removed
@@ -78,11 +74,11 @@ mod tests {
         assert_eq!(anim.current_frame(), Some(frames()[0]));
 
         // Increments to new frames
-        anim.increment_timer(Duration::from_millis(80));
+        anim.timer += Duration::from_millis(80);
         assert_eq!(anim.current_frame(), Some(frames()[1]));
 
         // Finishes the frame list
-        anim.increment_timer(Duration::from_millis(160));
+        anim.timer += Duration::from_millis(160);
         assert_eq!(anim.current_frame(), None);
     }
 
