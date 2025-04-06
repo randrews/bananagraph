@@ -2077,6 +2077,7 @@ dependencies = [
  "grid",
  "hecs",
  "log",
+ "thiserror 2.0.11",
  "tinyrand",
  "toml",
  "wasm-bindgen",

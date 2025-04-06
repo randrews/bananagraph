@@ -1,5 +1,7 @@
 use cgmath::Vector2;
 use hecs::{Entity, Query, World};
+use bananagraph::{DrawingContext, Sprite};
+use crate::components::Visible;
 
 /// We'll give these two convenient names
 pub type Loc = Vector2<i32>;
@@ -27,6 +29,17 @@ pub fn exists_at<T: Query>(world: &World, loc: impl Into<Loc>) -> bool {
     world.query::<(T, &OnMap)>().iter().any(
         |(_, (_, &om))| om.0 == loc
     )
+}
+
+impl OnMap {
+    pub fn system(world: &World, dc: DrawingContext) -> Vec<Sprite> {
+        // For now let's just display 16x8 tiles in the upper left corner of the dc.
+        world.query::<(&OnMap, &Visible)>().iter().map(|(_, (OnMap(loc), &vis))| {
+            let loc = loc * 16;
+            let pos = (loc.x as f32, loc.y as f32);
+            dc.place(vis, pos)
+        }).collect()
+    }
 }
 
 #[cfg(test)]

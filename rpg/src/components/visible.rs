@@ -4,3 +4,9 @@ use bananagraph::Sprite;
 /// job of combinations of components; OnMap + Visible is a map cell, Inventory + Visible, etc.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Visible(pub Sprite);
+
+impl Into<Sprite> for Visible {
+    fn into(self) -> Sprite {
+        self.0
+    }
+}
