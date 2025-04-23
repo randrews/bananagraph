@@ -33,8 +33,8 @@ pub async fn init_game(canvas_id: &str, seed: f64) -> JsGpuWrapper {
         })
         .expect("Failed to init wgpu somehow").await;
 
-    let mut handler = GameState::new((seed * pow(2.0, 32.0)) as u64);
-    handler.init(&mut wrapper);
+    let mut game_state = GameState::new((seed * pow(2.0, 32.0)) as u64);
+    game_state.init(&mut wrapper);
 
-    JsGpuWrapper::new(wrapper, handler)
+    JsGpuWrapper::new(wrapper, game_state)
 }

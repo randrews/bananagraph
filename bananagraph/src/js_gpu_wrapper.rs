@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut, Index};
 use std::time::Duration;
+use cgmath::Vector2;
 use crate::{Click, Dir, ElementState, GpuWrapper, IdBuffer, MouseButton, WindowEventHandler};
 use wasm_bindgen::prelude::wasm_bindgen;
 use crate::event_handler::KeyEvent;
@@ -97,6 +98,10 @@ impl JsGpuWrapper {
         // so exiting the game just means closing the tab, which we have no control over.
         self.handler.tick(dt);
         self.ids = self.handler.redraw((0.0, 0.0).into(), &self.wrapper)
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.wrapper.handle_resize(Vector2::new(width, height))
     }
 }
 
