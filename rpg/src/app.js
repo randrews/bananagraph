@@ -32,29 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         canvas.focus()
 
-        const resize = () => {
-            const step = 16
-            const maxHeight = Math.floor(window.innerHeight / step) * step
-            const maxWidth = Math.floor(window.innerWidth / step) * step
-            const widthFromMaxHeight = Math.floor(maxHeight * 4 / 3 / step) * step
-            const heightFromMaxWidth = Math.floor( maxWidth * 3 / 4 / step) * step
-
-            if (window.innerWidth < 800 || window.innerHeight < 600) {
-                canvas.width = 800
-                canvas.height = 600
-            } else if (widthFromMaxHeight < window.innerWidth) {
-                canvas.width = widthFromMaxHeight
-                canvas.height = maxHeight
-            } else {
-                canvas.width = maxWidth
-                canvas.height = heightFromMaxWidth
-            }
-            console.log([canvas.width, canvas.width % step,
-                canvas.height, canvas.height % step])
-            wrapper.resize(canvas.width, canvas.height)
-        }
-        addEventListener('resize', resize)
-        resize()
+        // When the viewport resizes, resize the logical dimensions of the canvas as well
+        const resizeObserver = new ResizeObserver(([newSize]) => {
+            wrapper.resize(newSize.contentRect.width, newSize.contentRect.height)
+        })
+        resizeObserver.observe(canvas)
 
         let time = 0
         const redraw = (newTime) => {

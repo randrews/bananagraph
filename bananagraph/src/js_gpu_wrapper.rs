@@ -101,7 +101,8 @@ impl JsGpuWrapper {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.wrapper.handle_resize(Vector2::new(width, height))
+        self.wrapper.handle_resize(Vector2::new(width, height));
+        self.wrapper.set_logical_size(Vector2::new(width, height))
     }
 }
 

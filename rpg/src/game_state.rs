@@ -40,7 +40,8 @@ impl WindowEventHandler for GameState {
 
     fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
         let zoom = 2.0;
-        let dc = DrawingContext::new((960.0 / zoom, 544.0 / zoom));
+
+        let dc = DrawingContext::new((wrapper.logical_size.x as f32 / zoom, wrapper.logical_size.y as f32 / zoom));
         let mut sprites = vec![];
         sprites.append(&mut OnMap::system(&self.world, dc));
         wrapper.redraw(sprites);

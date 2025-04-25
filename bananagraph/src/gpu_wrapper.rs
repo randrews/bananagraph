@@ -366,6 +366,11 @@ impl<'a> GpuWrapper<'a> {
         self.current_size = new_size;
     }
 
+    /// Update the logical size
+    pub fn set_logical_size(&mut self, new_size: Vector2<u32>) {
+        self.logical_size = new_size
+    }
+
     /// Creates a config object for the surface given a physical size. Called by `handle_resize`
     fn surface_config(surface_caps: &SurfaceCapabilities, format: TextureFormat, size: Vector2<u32>) -> wgpu::SurfaceConfiguration {
         wgpu::SurfaceConfiguration {

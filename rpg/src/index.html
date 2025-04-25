@@ -8,20 +8,27 @@
     canvas:focus {
       outline: none;
     }
-    canvas {
-      /*border: 3px solid #eae3d8;*/
-      /*border-radius: 1em;*/
-      /*padding: 0.5em;*/
+    .wrapper {
+      border: 3px solid #eae3d8;
+      border-radius: 1em;
+      padding: 0.5em;
       background: black;
+      object-fit: contain; /* Enlarge but keep aspect ratio */
+      aspect-ratio: 4 / 3; /* Aspect ratio of an old monitor, for aesthetics */
+      max-height: calc(100vh - 2em - 6px); /* Never overflow the viewport */
+      max-width: calc(100vw - 2em - 6px);
     }
-    body {
-      padding: 0;
+    canvas {
+      width: round(down, 100%, 16px); /* Keep your dimensions a multiple of 16 px (one tile) */
+      height: round(down, 100%, 16px);
     }
   </style>
 </head>
 <body style="background-color: #333333">
 <center>
-  <canvas tabindex="1" id="main_canvas"></canvas>
+  <div class="wrapper">
+    <canvas tabindex="1" id="main_canvas"></canvas>
+  </div>
 </center>
 </body>
 </html>
