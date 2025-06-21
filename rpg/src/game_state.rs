@@ -4,6 +4,7 @@ use toml::Table;
 use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, WindowEventHandler};
 use crate::components::OnMap;
 use crate::map_file::load_toml;
+use crate::sprites::SP;
 
 pub struct GameState {
     world: World
@@ -42,8 +43,9 @@ impl WindowEventHandler for GameState {
         let zoom = 2.0;
 
         let dc = DrawingContext::new((wrapper.logical_size.x as f32 / zoom, wrapper.logical_size.y as f32 / zoom));
+        let map_dc = dc.scaled_translate((SP * 8.0, SP));
         let mut sprites = vec![];
-        sprites.append(&mut OnMap::system(&self.world, dc));
+        sprites.append(&mut OnMap::system(&self.world, map_dc));
         wrapper.redraw(sprites);
         None
     }

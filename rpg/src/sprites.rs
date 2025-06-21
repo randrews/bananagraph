@@ -1,6 +1,9 @@
 use cgmath::Point2;
 use bananagraph::Sprite;
 
+/// The standard sprite dimension
+pub const SP: f32 = 16.0;
+
 /// Which layer certain sprites are on
 pub enum Layers {
     Dungeon
@@ -93,6 +96,11 @@ fn wall_sprite(neighbors: (bool, bool, bool, bool)) -> Sprite {
     };
 
     Sprite::new(Point2::from(origin) * 16, (16, 16)).with_layer(Layers::Dungeon.into())
+}
+
+/// The nine sections of a border: 4 corners, 4 edges, center
+pub enum Border {
+    NW, N, NE, E, SE, S, SW, W, C
 }
 
 #[cfg(test)]

@@ -73,6 +73,18 @@ impl DrawingContext {
         }
     }
 
+    /// Return a drawing context with the transform matrix translated by this vector in the space of the
+    /// transform matrix.
+    /// ```rust
+    /// # use bananagraph::{ DrawingContext };
+    /// let dc = DrawingContext::new((320.0, 200.0));
+    /// let dc2 = dc.scaled_translate((160.0, 0.0)); // Translate half the screen width right
+    /// ```
+    pub fn scaled_translate(self, delta: impl Into<Vector2<f32>>) -> Self {
+        let delta = delta.into();
+        self.translate((delta.x / self.screen.x, delta.y / self.screen.y))
+    }
+
     /// Return a drawing context with the transform matrix rotated by this angle
     /// We have to temporarily scale it with the aspect ratio of the screen, or doing this
     /// distorts the context
