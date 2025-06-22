@@ -17,3 +17,5 @@ image = "0.25.4"
 cgmath = "0.18.0"
 pollster = "0.3.0"
 wasm-bindgen = { version = "0.2", optional = true }
+egui = "0.31.1"
+egui-wgpu = "0.31.1"

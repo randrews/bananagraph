@@ -48,6 +48,7 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
             self.handler.tick(self.timer_length);
             if self.handler.running() {
                 self.id_buffer = self.handler.redraw(self.mouse_pos, self.wrapper.as_ref().unwrap());
+                self.handler.mut_redraw(self.wrapper.as_mut().unwrap());
                 event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + self.timer_length));
             } else {
                 event_loop.exit()
@@ -81,6 +82,7 @@ impl<H: WindowEventHandler> ApplicationHandler for App<'_, H> {
             // Redraw if it's redrawing time
             WindowEvent::RedrawRequested => {
                 self.id_buffer = self.handler.redraw(self.mouse_pos, self.wrapper.as_ref().unwrap());
+                self.handler.mut_redraw(self.wrapper.as_mut().unwrap());
             },
 
             // Resize if it's resizing time

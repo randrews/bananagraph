@@ -39,6 +39,10 @@ pub trait WindowEventHandler {
     /// handle future click events.
     fn redraw(&self, mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer>;
 
+    /// Run periodically to redraw the window. If this returns Some, then the given `IdBuffer` is used to
+    /// handle future click events.
+    fn mut_redraw(&self, wrapper: &mut GpuWrapper) {}
+
     /// Called at about 60 fps, with the actual duration between calls passed
     /// as a parameter.
     fn tick(&mut self, _dt: Duration) {}

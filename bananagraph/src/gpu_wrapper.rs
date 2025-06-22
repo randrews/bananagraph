@@ -2,6 +2,7 @@ use crate::scale_transform;
 use std::default::Default;
 use std::sync::Arc;
 use cgmath::Vector2;
+use egui::Ui;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{BlendState, Buffer, BufferUsages, Color, ColorWrites, CompareFunction, Device, Extent3d, LoadOp, ShaderModule, StoreOp, Surface, SurfaceCapabilities, SurfaceTarget, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture, TextureFormat, TextureUsages};
 use crate::id_buffer::IdBuffer;
@@ -48,6 +49,10 @@ pub struct GpuWrapper<'a> {
     /// we read them from
     id_texture: crate::texture::Texture,
     id_buffer: Arc<Buffer>,
+
+    /// The Renderer to render egui stuff
+    egui_renderer: egui_wgpu::Renderer,
+    egui_context: egui::Context,
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -70,6 +75,11 @@ impl<'a> GpuWrapper<'a> {
         let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader, format);
         let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
 
+        let mut egui_context = egui::Context::default();
+        egui_context.set_visuals(egui::Visuals::default());
+        //let egui_state = egui::State::new(egui_context.clone(), id, &window, None, None);
+        let egui_renderer = egui_wgpu::Renderer::new(&device, format, None, 1, true);
+
         Self {
             adapter,
             device,
@@ -86,6 +96,8 @@ impl<'a> GpuWrapper<'a> {
             depth_texture,
             id_texture,
             id_buffer,
+            egui_renderer,
+            egui_context,
             spritesheets: vec![],
         }
     }
@@ -492,6 +504,54 @@ impl<'a> GpuWrapper<'a> {
         self.call_shader(encoder, instances, layers, &self.id_pipeline, &target);
     }
 
+    pub fn call_egui(&mut self) {
+        let tex = self.surface.get_current_texture().unwrap();
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        let raw_input = egui::RawInput::default();
+        let full_output = self.egui_context.run(raw_input, |ctx| {
+            egui::CentralPanel::default().show(&ctx, |ui| {
+                ui.label("Hello world!");
+                if ui.button("Click me").clicked() {
+                    println!("you clicked it")
+                }
+            });
+        });
+        //handle_platform_output(full_output.platform_output);
+        let screen_descriptor = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.current_size.x, self.current_size.y],
+            pixels_per_point: 1.0,
+        };
+        let tris = self.egui_context.tessellate(full_output.shapes, full_output.pixels_per_point);
+
+        for (id, image_delta) in &full_output.textures_delta.set {
+            self.egui_renderer.update_texture(&self.device, &self.queue, *id, &image_delta);
+        }
+
+        self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &tris, &screen_descriptor);
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &tex.texture.create_view(&Default::default()),
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            label: Some("egui main render pass"),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        }).forget_lifetime();
+        self.egui_renderer.render(&mut rpass, tris.as_slice(), &screen_descriptor);
+        for x in &full_output.textures_delta.free {
+            self.egui_renderer.free_texture(x)
+        }
+        drop(rpass);
+        self.queue.submit(Some(encoder.finish()));
+        tex.present()
+    }
+
     /// We can only copy textures to buffers that are multiples of `COPY_BYTES_PER_ROW_ALIGNMENT`
     /// bytes wide. This is probably 64 pixels, so, we need to round up the size of the buffer to
     /// accommodate that width. For a texture `x` pixels wide, this returns the required row width, which is at least `x`:
@@ -658,5 +718,9 @@ impl<'a> GpuWrapper<'a> {
 
         let screen_width = self.id_texture.size.x;
         result.map(|data| IdBuffer::new(data, Self::id_buffer_width(screen_width), screen_width))
+    }
+
+    fn gui_logic(ui: &mut Ui) {
+        ui.heading("egui rendered this");
     }
 }
