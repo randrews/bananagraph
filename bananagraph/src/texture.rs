@@ -62,10 +62,10 @@ impl Texture {
     }
 
     /// Create a texture the size of the surface, with a given format and label
-    pub fn generic_texture(device: &Device, config: &wgpu::SurfaceConfiguration, label: Option<&str>, format: TextureFormat, usage: TextureUsages) -> Self {
+    pub fn generic_texture(device: &Device, size: Vector2<u32>, label: Option<&str>, format: TextureFormat, usage: TextureUsages) -> Self {
         let size = Extent3d {
-            width: config.width.max(1),
-            height: config.height.max(1),
+            width: size.x.max(1),
+            height: size.y.max(1),
             depth_or_array_layers: 1,
         };
 
@@ -88,11 +88,13 @@ impl Texture {
 
     /// Create a texture suitable for use as a depth texture
     pub fn create_depth_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        Self::generic_texture(device, config, Some("depth texture"), TextureFormat::Depth32Float, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
+        let size = (config.width, config.height).into();
+        Self::generic_texture(device, size, Some("depth texture"), TextureFormat::Depth32Float, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
     }
 
     /// Create a texture for the ID shader to use as its output
     pub fn create_id_texture(device: &Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        Self::generic_texture(device, config, Some("id texture"), TextureFormat::R32Uint, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC)
+        let size = (config.width, config.height).into();
+        Self::generic_texture(device, size, Some("id texture"), TextureFormat::R32Uint, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_SRC)
     }
 }

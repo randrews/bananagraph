@@ -51,8 +51,7 @@ pub struct GpuWrapper<'a> {
     id_buffer: Arc<Buffer>,
 
     /// The Renderer to render egui stuff
-    egui_renderer: egui_wgpu::Renderer,
-    egui_context: egui::Context,
+    egui_layer: crate::egui_layer::EguiLayer,
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -75,10 +74,7 @@ impl<'a> GpuWrapper<'a> {
         let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader, format);
         let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
 
-        let mut egui_context = egui::Context::default();
-        egui_context.set_visuals(egui::Visuals::default());
-        //let egui_state = egui::State::new(egui_context.clone(), id, &window, None, None);
-        let egui_renderer = egui_wgpu::Renderer::new(&device, format, None, 1, true);
+        let egui_layer = crate::egui_layer::EguiLayer::new(&device, logical_size, format);
 
         Self {
             adapter,
@@ -96,8 +92,7 @@ impl<'a> GpuWrapper<'a> {
             depth_texture,
             id_texture,
             id_buffer,
-            egui_renderer,
-            egui_context,
+            egui_layer,
             spritesheets: vec![],
         }
     }
@@ -399,33 +394,33 @@ impl<'a> GpuWrapper<'a> {
 
     /// The bind group for the render pass
     fn render_bind_groups(&self) -> Vec<wgpu::BindGroup> {
-        let bind_group_layout = self.render_pipeline.get_bind_group_layout(0);
-
-        self.spritesheets.iter().map(|sp|
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &bind_group_layout,
-                entries: &[
-                    // The sampler
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                    },
-                    // The texture for the spritesheet
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&sp.view),
-                    },
-                    // The uniform buffer, which contains the overall transform matrix
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: self.render_uniform_buffer.as_entire_binding(),
-                    },
-                ],
-            })
-        ).collect()
+        self.spritesheets.iter().map(|sp| self.bind_group_for_texture(sp)).collect()
     }
 
+    fn bind_group_for_texture(&self, texture: &crate::texture::Texture) -> wgpu::BindGroup {
+        let bind_group_layout = self.render_pipeline.get_bind_group_layout(0);
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                // The sampler
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                // The texture for the spritesheet
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                // The uniform buffer, which contains the overall transform matrix
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.render_uniform_buffer.as_entire_binding(),
+                },
+            ],
+        })
+    }
     /// Writes the scaling transform matrix to the uniform buffer, so the render pass can pick it up
     fn bind_for_render(&self) {
         self.queue.write_buffer(&self.render_uniform_buffer, 0, bytemuck::bytes_of(&scale_transform::transform(self.logical_size, self.current_size)));
@@ -487,6 +482,12 @@ impl<'a> GpuWrapper<'a> {
             rpass.draw_indexed(0..6, 0, start as u32..end as u32);
             start = end; // Jump to the next group
         }
+
+        let spr = Sprite::new((0, 0), self.egui_layer.texture().size).with_tint((1.0, 1.0, 1.0, 0.5));
+        let (buf, _) = self.set_sprites([spr]);
+        rpass.set_vertex_buffer(1, buf.slice(..));
+        rpass.set_bind_group(0, &self.bind_group_for_texture(self.egui_layer.texture()), &[]);
+        rpass.draw_indexed(0..6, 0, 0..1);
     }
 
     /// Queues a call to the render shader, which outputs color data to the surface
@@ -505,51 +506,7 @@ impl<'a> GpuWrapper<'a> {
     }
 
     pub fn call_egui(&mut self) {
-        let tex = self.surface.get_current_texture().unwrap();
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-        let raw_input = egui::RawInput::default();
-        let full_output = self.egui_context.run(raw_input, |ctx| {
-            egui::CentralPanel::default().show(&ctx, |ui| {
-                ui.label("Hello world!");
-                if ui.button("Click me").clicked() {
-                    println!("you clicked it")
-                }
-            });
-        });
-        //handle_platform_output(full_output.platform_output);
-        let screen_descriptor = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: [self.current_size.x, self.current_size.y],
-            pixels_per_point: 1.0,
-        };
-        let tris = self.egui_context.tessellate(full_output.shapes, full_output.pixels_per_point);
-
-        for (id, image_delta) in &full_output.textures_delta.set {
-            self.egui_renderer.update_texture(&self.device, &self.queue, *id, &image_delta);
-        }
-
-        self.egui_renderer.update_buffers(&self.device, &self.queue, &mut encoder, &tris, &screen_descriptor);
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &tex.texture.create_view(&Default::default()),
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: LoadOp::Load,
-                    store: StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            label: Some("egui main render pass"),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        }).forget_lifetime();
-        self.egui_renderer.render(&mut rpass, tris.as_slice(), &screen_descriptor);
-        for x in &full_output.textures_delta.free {
-            self.egui_renderer.free_texture(x)
-        }
-        drop(rpass);
-        self.queue.submit(Some(encoder.finish()));
-        tex.present()
+        self.egui_layer.render(&self.device, &self.queue);
     }
 
     /// We can only copy textures to buffers that are multiples of `COPY_BYTES_PER_ROW_ALIGNMENT`

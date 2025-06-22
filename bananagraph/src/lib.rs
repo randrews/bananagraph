@@ -22,6 +22,7 @@ pub use windowing::run_window;
 
 #[cfg(feature = "web")]
 mod js_gpu_wrapper;
+mod egui_layer;
 
 #[cfg(feature = "web")]
 pub use js_gpu_wrapper::JsGpuWrapper;

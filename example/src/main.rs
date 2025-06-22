@@ -53,7 +53,12 @@ impl WindowEventHandler for GameState {
                 .with_z(0.008),
             bg.with_z(0.9999)
         ]);
+
         None
+    }
+
+    fn mut_redraw(&self, wrapper: &mut GpuWrapper) {
+        wrapper.call_egui()
     }
 }
 
