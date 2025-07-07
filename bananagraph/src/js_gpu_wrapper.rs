@@ -97,7 +97,7 @@ impl JsGpuWrapper {
         // TODO normally we'd have some logic about exiting the game here, but, we're in a browser,
         // so exiting the game just means closing the tab, which we have no control over.
         self.handler.tick(dt);
-        self.ids = self.handler.redraw((0.0, 0.0).into(), &self.wrapper)
+        self.ids = self.handler.redraw((0.0, 0.0).into(), &mut self.wrapper)
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {

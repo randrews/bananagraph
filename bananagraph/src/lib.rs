@@ -13,6 +13,7 @@ pub use sprite::{Sprite, SpriteId};
 pub use drawing_context::DrawingContext;
 pub use event_handler::{Click, WindowEventHandler, MouseButton, Dir, ElementState};
 pub use typeface::{Typeface, Glyph, TypefaceBuilder, AddTexture};
+pub use egui_layer::EguiLayer;
 
 #[cfg(feature = "desktop")]
 mod windowing;

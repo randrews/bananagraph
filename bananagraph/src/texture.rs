@@ -68,7 +68,7 @@ impl Texture {
             height: size.y.max(1),
             depth_or_array_layers: 1,
         };
-
+println!("{}: {:?}", label.unwrap(), size);
         let desc = TextureDescriptor {
             label,
             size,

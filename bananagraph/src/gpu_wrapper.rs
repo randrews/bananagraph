@@ -1,4 +1,4 @@
-use crate::scale_transform;
+use crate::{scale_transform, EguiLayer};
 use std::default::Default;
 use std::sync::Arc;
 use cgmath::Vector2;
@@ -51,7 +51,11 @@ pub struct GpuWrapper<'a> {
     id_buffer: Arc<Buffer>,
 
     /// The Renderer to render egui stuff
-    egui_layer: crate::egui_layer::EguiLayer,
+    //egui_layer: crate::egui_layer::EguiLayer,
+
+    /// The TextureFormat for the output surface, used for initializing
+    /// Layers:
+    output_format: TextureFormat,
 }
 
 impl<'a> GpuWrapper<'a> {
@@ -74,8 +78,6 @@ impl<'a> GpuWrapper<'a> {
         let render_pipeline = Self::create_render_pipeline(&device, vertex_buffer_layout.clone(), &shader, format);
         let id_pipeline = Self::create_id_pipeline(&device, vertex_buffer_layout, &shader);
 
-        let egui_layer = crate::egui_layer::EguiLayer::new(&device, logical_size, format);
-
         Self {
             adapter,
             device,
@@ -92,9 +94,13 @@ impl<'a> GpuWrapper<'a> {
             depth_texture,
             id_texture,
             id_buffer,
-            egui_layer,
             spritesheets: vec![],
+            output_format: format,
         }
+    }
+
+    pub fn egui_layer(&self) -> EguiLayer {
+        EguiLayer::new(&self.device, self.current_size, self.output_format)
     }
 
     pub async fn create_device(target: impl Into<SurfaceTarget<'a>>) -> (Surface<'a>, wgpu::Adapter, Device, wgpu::Queue) {
@@ -352,6 +358,9 @@ impl<'a> GpuWrapper<'a> {
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
+            // mag_filter: wgpu::FilterMode::Linear,
+            // min_filter: wgpu::FilterMode::Linear,
+            // mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: 0.0,
             lod_max_clamp: 1.0,
             compare: None,
@@ -438,9 +447,21 @@ impl<'a> GpuWrapper<'a> {
         )
     }
 
+    /// Create an instance buffer containing one sprite which covers the entire display, for painting a Layer (like egui)
+    fn create_layer_instance_buffer(&self, sprite: Sprite) -> Buffer {
+        let raw_sprites = [sprite.into_raw(sprite.size)];
+        self.device.create_buffer_init(
+            &BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&raw_sprites),
+                usage: BufferUsages::VERTEX,
+            }
+        )
+    }
+
     /// Queues a call to an arbitrary shader pipeline, targeting an arbitrary texture view. It will
     /// iterate over the given instances for the unit-square-vertex-buffer.
-    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
+    fn call_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], egui_layer: Option<&EguiLayer>, pipeline: &wgpu::RenderPipeline, target: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: target,
@@ -462,10 +483,9 @@ impl<'a> GpuWrapper<'a> {
         });
         rpass.set_pipeline(pipeline);
         rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
         rpass.set_vertex_buffer(1, instances.slice(..));
-
-        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
         let bind_groups = self.render_bind_groups();
 
@@ -483,16 +503,18 @@ impl<'a> GpuWrapper<'a> {
             start = end; // Jump to the next group
         }
 
-        let spr = Sprite::new((0, 0), self.egui_layer.texture().size).with_tint((1.0, 1.0, 1.0, 0.5));
-        let (buf, _) = self.set_sprites([spr]);
-        rpass.set_vertex_buffer(1, buf.slice(..));
-        rpass.set_bind_group(0, &self.bind_group_for_texture(self.egui_layer.texture()), &[]);
-        rpass.draw_indexed(0..6, 0, 0..1);
+        if let Some(egui_layer) = egui_layer {
+            let spr = Sprite::new((0, 0), egui_layer.texture().size).with_tint((1.0, 1.0, 1.0, 0.8));
+            let buf = self.create_layer_instance_buffer(spr);
+            rpass.set_vertex_buffer(1, buf.slice(..));
+            rpass.set_bind_group(0, &self.bind_group_for_texture(egui_layer.texture()), &[]);
+            rpass.draw_indexed(0..6, 0, 0..1);
+        }
     }
 
     /// Queues a call to the render shader, which outputs color data to the surface
-    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], surface: &wgpu::SurfaceTexture) {
-        self.call_shader(encoder, instances, layers, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
+    fn call_render_shader(&self, encoder: &mut wgpu::CommandEncoder, instances: &Buffer, layers: &[u32], egui_layer: Option<&EguiLayer>, surface: &wgpu::SurfaceTexture) {
+        self.call_shader(encoder, instances, layers, egui_layer, &self.render_pipeline, &surface.texture.create_view(&Default::default()))
     }
 
     /// Queues a call to the id shader, which outputs sprite ids to id_texture
@@ -502,11 +524,11 @@ impl<'a> GpuWrapper<'a> {
             ..Default::default()
         });
 
-        self.call_shader(encoder, instances, layers, &self.id_pipeline, &target);
+        self.call_shader(encoder, instances, layers, None, &self.id_pipeline, &target);
     }
 
-    pub fn call_egui(&mut self) {
-        self.egui_layer.render(&self.device, &self.queue);
+    pub fn call_egui(&mut self, egui_layer: &mut EguiLayer) {
+        egui_layer.render(&self.device, &self.queue);
     }
 
     /// We can only copy textures to buffers that are multiples of `COPY_BYTES_PER_ROW_ALIGNMENT`
@@ -603,7 +625,7 @@ impl<'a> GpuWrapper<'a> {
 
         let (instance_buffer, layers) = self.set_sprites(sprites);
         self.bind_for_render();
-        self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
+        self.call_render_shader(&mut encoder, &instance_buffer, &layers, None, &tex);
 
         self.queue.submit(Some(encoder.finish()));
         tex.present()
@@ -612,14 +634,14 @@ impl<'a> GpuWrapper<'a> {
     /// Redraws the display and populates the id buffer, returning the buffer. This is marginally faster than
     /// calling both `redraw` and `redraw_ids` individually since it only encodes the sprites once, but, it
     /// only encodes the sprites once, so the same sprites will be used for both pipelines.
-    pub fn redraw_with_ids<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I) -> Result<IdBuffer, wgpu::BufferAsyncError> {
+    pub fn redraw_with_ids<I: IntoIterator<Item=S>,S: AsRef<Sprite>>(&self, sprites: I, egui_layer: Option<&EguiLayer>) -> Result<IdBuffer, wgpu::BufferAsyncError> {
         let tex = self.surface.get_current_texture().unwrap();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         let (instance_buffer, layers) = self.set_sprites(sprites);
         self.bind_for_render();
 
-        self.call_render_shader(&mut encoder, &instance_buffer, &layers, &tex);
+        self.call_render_shader(&mut encoder, &instance_buffer, &layers, egui_layer, &tex);
         self.call_id_shader(&mut encoder, &instance_buffer, &layers);
         self.read_id_texture(&mut encoder);
 

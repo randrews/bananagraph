@@ -1,16 +1,19 @@
-use bananagraph::{DrawingContext, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
+use bananagraph::{Click, DrawingContext, ElementState, GpuWrapper, IdBuffer, Sprite, WindowEventHandler};
 use cgmath::{Deg, Point2};
 
 struct GameState {
+    egui_layer: Option<bananagraph::EguiLayer>
 }
 
 impl WindowEventHandler for GameState {
     fn init(&mut self, wrapper: &mut GpuWrapper) {
         wrapper.add_texture(include_bytes!("cube.png"), None);
         wrapper.add_texture(include_bytes!("background.png"), None);
+
+        self.egui_layer = Some(wrapper.egui_layer());
     }
 
-    fn redraw(&self, _mouse_pos: Point2<f64>, wrapper: &GpuWrapper) -> Option<IdBuffer> {
+    fn redraw(&mut self, mouse_pos: Point2<f64>, wrapper: &mut GpuWrapper) -> Option<IdBuffer> {
         // let (w, h) = (400.0, 225.0);
         // let sprite = Sprite::new((0, 0), (32, 32))
         //     //.translate((-0.5, -0.5))
@@ -34,7 +37,10 @@ impl WindowEventHandler for GameState {
             .scale((0.5, 0.5))
             .translate((0.25, 0.5));
 
-        wrapper.redraw(vec![
+        self.egui_layer.as_mut().unwrap().mouse_move(mouse_pos);
+        wrapper.call_egui(&mut self.egui_layer.as_mut().unwrap());
+
+        wrapper.redraw_with_ids(vec![
             dc.place(bg, (0.0, 0.0)), // Just draw the grayness straight
             dc.place_rotated(sprite, (0.0, 0.0), Deg(45.0)), // Rotate the cube about its center
             sprite
@@ -52,17 +58,17 @@ impl WindowEventHandler for GameState {
                 .scale((1.0 / 400.0, 1.0 / 225.0)) // Scale everything back down by the size of the world, also removes distortion
                 .with_z(0.008),
             bg.with_z(0.9999)
-        ]);
+        ], Some(&self.egui_layer.as_ref().unwrap())).unwrap();
 
         None
     }
 
-    fn mut_redraw(&self, wrapper: &mut GpuWrapper) {
-        wrapper.call_egui()
+    fn click(&mut self, event: Click) {
+        self.egui_layer.as_mut().unwrap().mouse_click(event.mouse_pos, event.button, event.state == ElementState::Pressed)
     }
 }
 
 pub fn main() {
     let size = (800, 450);
-    let _ = pollster::block_on(bananagraph::run_window("Bananagraph example", size.into(), size.into(), GameState {}));
+    let _ = pollster::block_on(bananagraph::run_window("Bananagraph example", size.into(), size.into(), GameState { egui_layer: None }));
 }
